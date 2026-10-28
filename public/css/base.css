@@ -89,6 +89,11 @@ body {
     background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
     padding: 4px 10px; border-radius: 99px; white-space: nowrap;
 }
+.flight-distance-pill {
+    padding: 2px 6px; border: 0; border-radius: 8px; background: transparent;
+    color: inherit; font: inherit; font-size: 10px; cursor: pointer;
+}
+.flight-distance-pill:hover { background: rgba(255,255,255,0.08); }
 
 .ldr-dock-footer {
     display: flex; align-items: center; gap: 8px;

@@ -9,6 +9,7 @@ let isEditingCuisineTags = false;
 let isFoodMapViewOpen = false;
 let foodLeafletMap = null;
 let foodMapMarkers = [];
+let hasLoadedRestaurants = false;
 
 let pendingSpotLat = null;
 let pendingSpotLng = null;
@@ -35,10 +36,7 @@ function checkRestaurantDuplicate(val) {
         warnEl.style.display = 'none';
         return;
     }
-    const match = restaurants.find(r =>
-        r.id !== editingRestaurantId &&
-        (r.name.toLowerCase().includes(clean) || clean.includes(r.name.toLowerCase()))
-    );
+    const match = findSimilarName(clean, restaurants, editingRestaurantId);
     if (match) {
         warnEl.style.display = 'block';
         warnEl.innerText = `⚠️ Looks similar to "${match.name}" (${match.city}) already on your list!`;
@@ -114,10 +112,12 @@ async function fetchRestaurants() {
         renderRestaurantList();
         return;
     }
+    if (!hasLoadedRestaurants) renderLoadingSkeleton(document.getElementById('food-ul'));
     try {
         const res = await apiFetch('/api/restaurants');
         const data = await res.json();
         restaurants = data.restaurants || [];
+        hasLoadedRestaurants = true;
         if (data.customCuisines && data.customCuisines.length > 0) {
             customCuisines = data.customCuisines;
         }
@@ -127,7 +127,12 @@ async function fetchRestaurants() {
         renderRestaurantFormChips();
         renderRestaurantList();
         if (typeof checkWrappedVisibility === 'function') checkWrappedVisibility();
-    } catch (e) {}
+    } catch (e) {
+        if (!hasLoadedRestaurants) {
+            const list = document.getElementById('food-ul');
+            if (list) list.innerHTML = '<li class="idea-item" style="text-align:center;opacity:0.7;">Could not load spots. Check your connection and try again.</li>';
+        }
+    }
 }
 
 function toggleFoodFormDrawer() {
@@ -365,9 +370,9 @@ function renderFoodMap(filteredSpots) {
     if (!isFoodMapViewOpen || typeof L === 'undefined') return;
     const list = filteredSpots || restaurants;
     if (!foodLeafletMap) {
-        foodLeafletMap = L.map('food-leaflet-map').setView([38.7223, -9.1393], 12);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; OpenStreetMap',
+        foodLeafletMap = L.map('food-leaflet-map').setView([38.7223, -9.1393], 4);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(foodLeafletMap);
     }
@@ -378,11 +383,14 @@ function renderFoodMap(filteredSpots) {
 
     const bounds = [];
     list.forEach(r => {
-        if (!r.lat || !r.lng) return;
+        if (r.lat === null || r.lat === undefined || r.lat === '' || r.lng === null || r.lng === undefined || r.lng === '') return;
+        const lat = Number(r.lat);
+        const lng = Number(r.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return;
         const mapsHref = r.mapsLink && r.mapsLink.startsWith('http')
             ? r.mapsLink
             : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.name + ' ' + r.city)}`;
-        const marker = L.circleMarker([r.lat, r.lng], {
+        const marker = L.circleMarker([lat, lng], {
             radius: 8,
             fillColor: r.isVisited ? '#10b981' : '#cba6f7',
             color: '#1e1e2e',
@@ -399,7 +407,7 @@ function renderFoodMap(filteredSpots) {
             </div>
         `);
         foodMapMarkers.push(marker);
-        bounds.push([r.lat, r.lng]);
+        bounds.push([lat, lng]);
     });
 
     if (bounds.length > 0) {
@@ -535,6 +543,7 @@ function renderRestaurantList() {
 }
 
 async function pickRandomRestaurant() {
+    requestDeviceMotionAccess();
     triggerHaptic(15);
     const pool = restaurants.filter(r => {
         if (activeSpotMode !== 'all' && (r.spotType || 'dining') !== activeSpotMode) return false;

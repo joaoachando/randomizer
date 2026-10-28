@@ -19,6 +19,7 @@ let vapidPublicKey = '';
 let cityWeatherCache = {};
 let countdownTimerId = null;
 let hubPollTimerId = null;
+let distanceUnit = localStorage.getItem('p3_distance_unit') === 'mi' ? 'mi' : 'km';
 
 function isPushMuted() { return localStorage.getItem('p3_push_muted') === '1'; }
 function isAutoLocEnabled() { return localStorage.getItem('p3_auto_loc') === '1'; }
@@ -176,11 +177,16 @@ function updateCountdownTick() {
     if (tagEl) tagEl.innerText = label;
 
     const fNum = (hubSettings.flightNumber || '').trim().toUpperCase();
+    const targetUtcMs = hubSettings.countdownUtcMs
+        ? Number(hubSettings.countdownUtcMs)
+        : localDateTimeToUtcMs(hubSettings.countdownDate, getTargetTimezoneIANA(hubSettings.countdownTzOwner || 'jenna'));
+    const untilArrivalMs = targetUtcMs - Date.now();
     if (flightPill) {
-        if (fNum) {
+        if (fNum && untilArrivalMs >= 0 && untilArrivalMs <= 86400000) {
             flightPill.style.display = 'inline-block';
             flightPill.innerText = `✈️ ${fNum}`;
-            flightPill.href = `https://www.google.com/search?q=${encodeURIComponent(fNum + ' flight status')}`;
+            flightPill.href = `https://www.flightaware.com/live/flight/${encodeURIComponent(fNum)}`;
+            flightPill.title = `Live flight status for ${fNum}`;
         } else {
             flightPill.style.display = 'none';
         }
@@ -193,11 +199,6 @@ function updateCountdownTick() {
     }
 
     const tzOwner = hubSettings.countdownTzOwner || 'jenna';
-    const ianaTz = getTargetTimezoneIANA(tzOwner);
-    const targetUtcMs = hubSettings.countdownUtcMs
-        ? Number(hubSettings.countdownUtcMs)
-        : localDateTimeToUtcMs(hubSettings.countdownDate, ianaTz);
-
     const nowMs = Date.now();
     const diffMs = targetUtcMs - nowMs;
 
@@ -322,10 +323,24 @@ function renderWeatherTzPill() {
     renderCol(col1, m1, city1, 'Europe/Lisbon');
     renderCol(col2, m2, city2, 'America/New_York');
 
-    if (distEl && m1 && m2 && m1.latitude && m2.latitude) {
+    if (distEl && m1 && m2 && Number.isFinite(m1.latitude) && Number.isFinite(m2.latitude)) {
         const km = calcHaversineKm(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
-        distEl.innerText = km < 25 ? '🎉 0 km • Together!' : `🌍 ${km.toLocaleString()} km apart`;
+        if (km < 1) {
+            distEl.innerText = '🎉 0 km • Together!';
+        } else if (distanceUnit === 'mi') {
+            const miles = km * 0.621371;
+            distEl.innerText = `🌍 ${miles.toLocaleString(undefined, { maximumFractionDigits: 0 })} mi apart`;
+        } else {
+            distEl.innerText = `🌍 ${km.toLocaleString()} km apart`;
+        }
     }
+}
+
+function toggleDistanceUnit(event) {
+    event.stopPropagation();
+    distanceUnit = distanceUnit === 'km' ? 'mi' : 'km';
+    localStorage.setItem('p3_distance_unit', distanceUnit);
+    renderWeatherTzPill();
 }
 
 // VISIT PREP CHECKLIST (BRING / GET / HAVE READY)
@@ -356,7 +371,7 @@ function renderVisitChecklist() {
     ul.innerHTML = filtered.map(item => `
         <li class="idea-item" style="padding: 10px 12px; flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 6px;">
             <label style="display:flex;align-items:center;gap:9px;cursor:pointer;flex:1;${item.isDone ? 'text-decoration:line-through;opacity:0.55;' : ''}">
-                <input type="checkbox" ${item.isDone ? 'checked' : ''} onchange="toggleChecklistItem(${item.id}, this.checked)" style="width:16px;height:16px;margin:0;">
+                <input class="prep-checkbox" type="checkbox" ${item.isDone ? 'checked' : ''} onchange="toggleChecklistItem(${item.id}, this.checked)" aria-label="Mark item complete">
                 <span style="font-size:13px;font-weight:600;">${linkify(item.text)}</span>
             </label>
             <div style="display:flex;align-items:center;gap:6px;">

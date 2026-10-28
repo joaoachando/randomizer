@@ -1,4 +1,51 @@
 let activeIdeaTripFilter = 'all';
+let lastWinnerIdea = null;
+let hasLoadedIdeas = false;
+
+async function pickRandom() {
+    requestDeviceMotionAccess();
+    triggerHaptic(15);
+    const pool = ideas.filter(idea => {
+        if (idea.isDone || masterQuickFilter === 'done') return false;
+        if (activeIdeaTripFilter !== 'all' && idea.tripFolder !== activeIdeaTripFilter) return false;
+        if (masterQuickFilter === 'secret' && !idea.isSecret) return false;
+        if (masterQuickFilter === 'indoor' && idea.location !== 'indoor') return false;
+        if (masterQuickFilter === 'outdoor' && idea.location !== 'outdoor') return false;
+        if (Object.entries(playState).some(([key, value]) => {
+            if (value === 'any') return false;
+            if (key === 'spicy') return value === 'only' ? !idea.spicy : Boolean(idea.spicy);
+            return idea[key] !== value;
+        })) return false;
+        return true;
+    });
+    if (pool.length === 0) return showToast('No date ideas match your current filters!', true);
+
+    lastWinnerIdea = pool[Math.floor(Math.random() * pool.length)];
+    lastRolledWinnerId = lastWinnerIdea.id;
+    const titleEl = document.getElementById('winner-text');
+    const descEl = document.getElementById('winner-description');
+    const headerEl = document.getElementById('winner-header-label');
+    const rerollBtn = document.getElementById('winner-reroll-btn');
+    const pinBtn = document.getElementById('winner-pin-btn');
+    document.getElementById('result-overlay').style.display = 'flex';
+    rerollBtn.onclick = pickRandom;
+    pinBtn.innerText = "📌 Let's Do It!";
+    pinBtn.onclick = pinWinnerDate;
+    headerEl.innerText = '🎲 Rolling a date idea...';
+    descEl.style.display = 'none';
+
+    for (const delay of [60, 80, 110, 145, 190]) {
+        const sample = pool[Math.floor(Math.random() * pool.length)];
+        titleEl.innerText = sample.isSecret ? '👀 Secret Surprise' : sample.title;
+        await new Promise(resolve => setTimeout(resolve, delay));
+    }
+
+    titleEl.innerText = lastWinnerIdea.isSecret ? '👀 Secret Surprise Date' : lastWinnerIdea.title;
+    headerEl.innerText = '🎉 Your date idea!';
+    descEl.innerHTML = `${lastWinnerIdea.description ? linkify(lastWinnerIdea.description) : ''}<br>${lastWinnerIdea.vibe || ''}`;
+    descEl.style.display = 'block';
+    triggerConfetti();
+}
 
 function checkIdeaDuplicate(val) {
     const warnEl = document.getElementById('n-dup-warning');
@@ -8,11 +55,7 @@ function checkIdeaDuplicate(val) {
         warnEl.style.display = 'none';
         return;
     }
-    const match = ideas.find(i =>
-        i.id !== editingIdeaId &&
-        !i.isSecret &&
-        (i.title.toLowerCase().includes(clean) || clean.includes(i.title.toLowerCase()))
-    );
+    const match = findSimilarName(clean, ideas.filter(i => !i.isSecret), editingIdeaId);
     if (match) {
         warnEl.style.display = 'block';
         warnEl.innerText = `⚠️ Looks similar to "${match.title}" already on your list!`;
@@ -37,9 +80,11 @@ function toggleDateFormDrawer() {
 }
 
 async function fetchIdeas() {
+    if (!hasLoadedIdeas) renderLoadingSkeleton(document.getElementById('idea-ul'));
     const res = await apiFetch('/api/ideas');
     const data = await res.json();
     ideas = data.ideas || [];
+    hasLoadedIdeas = true;
     renderPinnedBanner();
     renderList();
     if (typeof renderRestaurantFormChips === 'function') renderRestaurantFormChips();

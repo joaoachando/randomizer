@@ -79,19 +79,27 @@ function handleMemoryPhotoSelect(event) {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_DIM = 720;
-            let w = img.width, h = img.height;
-            if (w > h && w > MAX_DIM) { h = Math.round((h * MAX_DIM) / w); w = MAX_DIM; }
-            else if (h > MAX_DIM) { w = Math.round((w * MAX_DIM) / h); h = MAX_DIM; }
-
-            canvas.width = w;
-            canvas.height = h;
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, w, h);
+            if (!ctx) return showToast('Could not process this photo.', true);
+            const scaleToFit = Math.min(1, 720 / Math.max(img.width, img.height));
+            let quality = 0.72;
+            let scale = scaleToFit;
+            let dataUrl = '';
+            let sizeBytes = 0;
 
-            let dataUrl = canvas.toDataURL('image/webp', 0.72);
-            if (!dataUrl.startsWith('data:image/webp')) {
-                dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+            for (let attempt = 0; attempt < 14; attempt++) {
+                const w = Math.max(1, Math.round(img.width * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                canvas.width = w;
+                canvas.height = h;
+                ctx.drawImage(img, 0, 0, w, h);
+                dataUrl = canvas.toDataURL('image/webp', quality);
+                if (!dataUrl.startsWith('data:image/webp')) dataUrl = canvas.toDataURL('image/jpeg', quality);
+                const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+                sizeBytes = Math.ceil(base64.length * 3 / 4);
+                if (sizeBytes <= 35 * 1024) break;
+                if (quality > 0.4) quality = Math.max(0.4, quality - 0.1);
+                else scale *= 0.8;
             }
             pendingMemoryPhoto = dataUrl;
             const prevImg = document.getElementById('memory-photo-preview');
@@ -99,7 +107,7 @@ function handleMemoryPhotoSelect(event) {
             if (prevImg) { prevImg.src = pendingMemoryPhoto; prevImg.style.display = 'block'; }
             if (clearBtn) clearBtn.style.display = 'inline-block';
             triggerHaptic(10);
-            showToast("📷 Photo compressed & ready!");
+            showToast(`📷 Photo compressed to ${Math.round(sizeBytes / 1024)} KB`);
         };
         img.src = e.target.result;
     };
@@ -208,38 +216,41 @@ function openTripDashboardModal(tripName) {
     const tripIdeas = (typeof ideas !== 'undefined' ? ideas : []).filter(i => i.tripFolder === tripName);
     const tripSpots = (typeof restaurants !== 'undefined' ? restaurants : []).filter(r => r.tripFolder === tripName);
 
-    const todoIdeas = tripIdeas.filter(i => !i.isDone);
-    const todoSpots = tripSpots.filter(r => !r.isVisited);
     const doneCount = tripIdeas.filter(i => i.isDone).length + tripSpots.filter(r => r.isVisited).length;
     const totalCount = tripIdeas.length + tripSpots.length;
 
-    const ideasHtml = tripIdeas.map(i => `
-        <div class="idea-item" style="padding:10px 12px;margin-bottom:6px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-weight:700;font-size:13px;${i.isDone ? 'text-decoration:line-through;opacity:0.6;' : ''}">🎲 ${i.isSecret ? '👀 Secret Idea' : i.title}</span>
-                <span class="badge">${i.isDone ? '✅ Done' : i.vibe}</span>
-            </div>
-        </div>
-    `).join('') || `<div style="font-size:12px;opacity:0.6;margin-bottom:8px;">No date ideas tagged for this trip yet.</div>`;
-
-    const spotsHtml = tripSpots.map(r => `
-        <div class="idea-item" style="padding:10px 12px;margin-bottom:6px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-weight:700;font-size:13px;${r.isVisited ? 'text-decoration:line-through;opacity:0.6;' : ''}">🍽️ ${r.name} <span style="opacity:0.65;font-weight:500;">(${r.city})</span></span>
-                <span class="badge">${r.isVisited ? '✅ Visited' : r.cuisine}</span>
-            </div>
-        </div>
-    `).join('') || `<div style="font-size:12px;opacity:0.6;">No food spots tagged for this trip yet.</div>`;
+    const renderTripGroup = (done) => {
+        const items = [
+            ...tripIdeas.filter(i => Boolean(i.isDone) === done).map(i => ({
+                label: `🎲 ${i.isSecret ? '👀 Secret Idea' : i.title}`,
+                detail: i.isDone ? '✅ Done' : i.vibe
+            })),
+            ...tripSpots.filter(r => Boolean(r.isVisited) === done).map(r => ({
+                label: `🍽️ ${r.name} (${r.city})`,
+                detail: r.isVisited ? '✅ Visited' : r.cuisine
+            }))
+        ];
+        return items.length
+            ? items.map(item => `
+                <div class="idea-item" style="padding:10px 12px;margin-bottom:6px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                        <span style="font-weight:700;font-size:13px;${done ? 'text-decoration:line-through;opacity:0.6;' : ''}">${item.label}</span>
+                        <span class="badge">${item.detail || ''}</span>
+                    </div>
+                </div>
+            `).join('')
+            : `<div style="font-size:12px;opacity:0.6;margin-bottom:8px;">Nothing here yet.</div>`;
+    };
 
     bodyEl.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;background:rgba(0,0,0,0.22);padding:10px 14px;border-radius:12px;">
             <span style="font-size:12.5px;font-weight:700;">Progress: ${doneCount} / ${totalCount} Completed</span>
-            ${(todoIdeas.length + todoSpots.length) > 0 ? `<button class="reset-btn" onclick="spinFromTripFolder('${tripName.replace(/'/g, "\\'")}')" style="border-color:var(--accent);color:var(--accent);font-weight:800;">🎰 Spin Trip</button>` : ''}
+            ${doneCount < totalCount ? `<button class="reset-btn" onclick="spinFromTripFolder('${tripName.replace(/'/g, "\\'")}')" style="border-color:var(--accent);color:var(--accent);font-weight:800;">🎰 Spin Trip</button>` : ''}
         </div>
-        <span class="filter-label">🎲 Trip Date Ideas (${tripIdeas.length})</span>
-        ${ideasHtml}
-        <span class="filter-label" style="margin-top:12px;">🍽️ Trip Food & Cafe Spots (${tripSpots.length})</span>
-        ${spotsHtml}
+        <span class="filter-label">📍 To Do (${totalCount - doneCount})</span>
+        ${renderTripGroup(false)}
+        <span class="filter-label" style="margin-top:12px;">✅ Visited / Completed (${doneCount})</span>
+        ${renderTripGroup(true)}
     `;
     modal.style.display = 'flex';
 }

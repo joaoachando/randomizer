@@ -24,6 +24,17 @@ function showToast(msg, isError = false) {
     setTimeout(() => toast.remove(), 3200);
 }
 
+function renderLoadingSkeleton(list, count = 3) {
+    if (!list) return;
+    list.innerHTML = Array.from({ length: count }, () => `
+        <li class="idea-item skeleton-list-item" aria-hidden="true">
+            <span class="skeleton-shimmer" style="width:58%;height:16px;"></span>
+            <span class="skeleton-shimmer" style="width:88%;height:11px;"></span>
+            <span class="skeleton-shimmer" style="width:36%;height:10px;"></span>
+        </li>
+    `).join('');
+}
+
 function askConfirm(message) {
     triggerHaptic(12);
     return new Promise((resolve) => {
@@ -50,6 +61,42 @@ function linkify(text) {
     return safe.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: underline;" onclick="event.stopPropagation()">🔗 Link</a>');
 }
 
+function findSimilarName(value, entries, excludeId) {
+    const normalize = text => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const target = normalize(value);
+    if (target.length < 3) return null;
+
+    let best = null;
+    let bestRatio = Infinity;
+    for (const entry of entries) {
+        if (entry.id === excludeId) continue;
+        const name = normalize(entry.name || entry.title);
+        if (name.length < 3) continue;
+        if (name.includes(target) || target.includes(name)) return entry;
+        if (Math.min(name.length, target.length) / Math.max(name.length, target.length) < 0.7) continue;
+
+        let previous = Array.from({ length: name.length + 1 }, (_, index) => index);
+        for (let i = 1; i <= target.length; i++) {
+            const current = [i];
+            for (let j = 1; j <= name.length; j++) {
+                current[j] = Math.min(
+                    current[j - 1] + 1,
+                    previous[j] + 1,
+                    previous[j - 1] + (target[i - 1] === name[j - 1] ? 0 : 1)
+                );
+            }
+            previous = current;
+        }
+        const distance = previous[name.length];
+        const ratio = distance / Math.max(name.length, target.length);
+        if (distance <= Math.max(1, Math.floor(Math.max(name.length, target.length) * 0.25)) && ratio < bestRatio) {
+            best = entry;
+            bestRatio = ratio;
+        }
+    }
+    return best;
+}
+
 // OFFLINE-FIRST API FETCH WITH GET CACHE & WRITE OUTBOX QUEUE
 async function apiFetch(url, options = {}) {
     const method = (options.method || 'GET').toUpperCase();
@@ -65,19 +112,19 @@ async function apiFetch(url, options = {}) {
         if (method === 'GET' && res.ok) {
             const clone = res.clone();
             clone.text().then(txt => {
-                try { localStorage.setItem(`p3_cache_${url}`, txt); } catch (e) {}
+                try { localStorage.setItem(`p3_cache_${userName}_${url}`, txt); } catch (e) {}
             });
         }
         return res;
     } catch (err) {
         if (method === 'GET') {
-            const cached = localStorage.getItem(`p3_cache_${url}`);
+            const cached = localStorage.getItem(`p3_cache_${userName}_${url}`);
             if (cached) {
                 return new Response(cached, { status: 200, headers: { 'Content-Type': 'application/json' } });
             }
         } else {
             const outbox = JSON.parse(localStorage.getItem('p3_outbox') || '[]');
-            outbox.push({ url, options: { method, body: options.body }, ts: Date.now() });
+            outbox.push({ url, options: { method, body: options.body }, user: userName, ts: Date.now() });
             localStorage.setItem('p3_outbox', JSON.stringify(outbox));
             showToast("📡 Saved offline — will sync automatically!");
             return new Response(JSON.stringify({ success: true, offline: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -92,21 +139,50 @@ async function flushOfflineOutbox() {
     const outbox = JSON.parse(raw);
     if (outbox.length === 0) return;
 
-    localStorage.removeItem('p3_outbox');
-    for (const item of outbox) {
+    const pending = [];
+    let synced = 0;
+    let networkFailed = false;
+    for (const [index, item] of outbox.entries()) {
+        if (networkFailed || item.user !== userName) {
+            pending.push(item);
+            continue;
+        }
         try {
-            await apiFetch(item.url, item.options);
-        } catch (e) {}
+            const res = await fetch(item.url, {
+                ...item.options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-name': userName,
+                    'x-user-password': userPassword
+                }
+            });
+            if (!res.ok) {
+                pending.push(...outbox.slice(index));
+                networkFailed = true;
+                break;
+            }
+            synced++;
+        } catch (e) {
+            pending.push(...outbox.slice(index));
+            networkFailed = true;
+            break;
+        }
     }
-    showToast(`🌐 Synced ${outbox.length} offline update(s)!`);
-    if (typeof fetchIdeas === 'function') fetchIdeas();
-    if (typeof fetchRestaurants === 'function') fetchRestaurants();
-    if (typeof fetchHubData === 'function') fetchHubData();
+    if (pending.length) localStorage.setItem('p3_outbox', JSON.stringify(pending));
+    else localStorage.removeItem('p3_outbox');
+    if (synced) {
+        showToast(`🌐 Synced ${synced} offline update(s)!`);
+        if (typeof fetchIdeas === 'function') fetchIdeas();
+        if (typeof fetchRestaurants === 'function') fetchRestaurants();
+        if (typeof fetchHubData === 'function') fetchHubData();
+    }
+    if (networkFailed) showToast('Some offline updates are still waiting to sync.', true);
 }
 window.addEventListener('online', flushOfflineOutbox);
 
 function switchTab(tabId) {
     triggerHaptic(8);
+    requestDeviceMotionAccess();
     const mainTabs = document.getElementById('main-tabs');
     if (mainTabs) mainTabs.style.display = 'flex';
 
@@ -131,16 +207,28 @@ function toggleGuestLogin() {
 }
 
 // FACEID / TOUCHID WEBAUTHN BIOMETRIC UNLOCK
+function readBiometricVault() {
+    const raw = localStorage.getItem('p3_bio_vault');
+    if (!raw) return null;
+    try {
+        const vault = JSON.parse(raw);
+        return vault && typeof vault === 'object' ? vault : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function checkBiometricButtonVisibility() {
     const btn = document.getElementById('bio-unlock-btn');
     if (!btn) return;
-    const savedVault = localStorage.getItem('p3_bio_vault');
-    btn.style.display = (savedVault && window.PublicKeyCredential) ? 'block' : 'none';
+    const vault = readBiometricVault();
+    btn.style.display = (vault && vault.credentialId && window.PublicKeyCredential) ? 'block' : 'none';
 }
 
 async function registerBiometricIfSupported(name, password) {
     if (!window.PublicKeyCredential || name === 'Guest') return;
-    if (localStorage.getItem('p3_bio_vault')) return;
+    const existingVault = readBiometricVault();
+    if (existingVault && existingVault.credentialId) return;
     try {
         const avail = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
         if (!avail) return;
@@ -157,21 +245,33 @@ async function registerBiometricIfSupported(name, password) {
             }
         });
         if (cred) {
-            localStorage.setItem('p3_bio_vault', JSON.stringify({ name, password }));
+            const credentialId = Array.from(new Uint8Array(cred.rawId));
+            localStorage.setItem('p3_bio_vault', JSON.stringify({ name, password, credentialId }));
             showToast("🔐 FaceID / TouchID enabled for next time!");
+            checkBiometricButtonVisibility();
         }
     } catch (e) {}
 }
 
 async function unlockWithBiometrics() {
-    const raw = localStorage.getItem('p3_bio_vault');
-    if (!raw || !window.PublicKeyCredential) return;
+    const vault = readBiometricVault();
+    if (!vault || !window.PublicKeyCredential) return;
     try {
+        if (!Array.isArray(vault.credentialId)) throw new Error('No registered biometric credential');
         const challenge = crypto.getRandomValues(new Uint8Array(32));
-        await navigator.credentials.get({
-            publicKey: { challenge, userVerification: "required", timeout: 30000 }
+        const assertion = await navigator.credentials.get({
+            publicKey: {
+                challenge,
+                allowCredentials: [{ type: 'public-key', id: new Uint8Array(vault.credentialId) }],
+                userVerification: "required",
+                timeout: 30000
+            }
         });
-        const vault = JSON.parse(raw);
+        if (!(assertion instanceof PublicKeyCredential) ||
+            assertion.rawId.byteLength !== vault.credentialId.length ||
+            !Array.from(new Uint8Array(assertion.rawId)).every((byte, index) => byte === vault.credentialId[index])) {
+            throw new Error('Biometric credential did not match');
+        }
         document.getElementById('login-name').value = vault.name;
         document.getElementById('password-input').value = vault.password;
         await login();
@@ -224,32 +324,70 @@ function logout() {
 
 // SHAKE-TO-SPIN ACCELEROMETER HOOK
 let lastShakeTime = 0;
-function initShakeToSpin() {
-    if (!('DeviceMotionEvent' in window)) return;
-    window.addEventListener('devicemotion', (event) => {
-        const acc = event.accelerationIncludingGravity;
-        if (!acc) return;
-        const totalForce = Math.abs(acc.x || 0) + Math.abs(acc.y || 0) + Math.abs(acc.z || 0);
-        if (totalForce > 38 && (Date.now() - lastShakeTime > 2500)) {
-            const modalOpen = ['login-overlay', 'result-overlay', 'memory-overlay'].some(id => {
-                const el = document.getElementById(id);
-                return el && el.style.display === 'flex';
-            });
-            if (modalOpen) return;
+let shakeListenerInstalled = false;
+let previousGravitySample = null;
 
-            const playActive = document.getElementById('tab-play')?.classList.contains('active');
-            const foodActive = document.getElementById('tab-food')?.classList.contains('active');
-            if (playActive && typeof pickRandom === 'function') {
-                lastShakeTime = Date.now();
-                triggerHaptic([30, 50, 40]);
-                pickRandom();
-            } else if (foodActive && typeof pickRandomRestaurant === 'function') {
-                lastShakeTime = Date.now();
-                triggerHaptic([30, 50, 40]);
-                pickRandomRestaurant();
+function installShakeListener() {
+    if (shakeListenerInstalled || !('DeviceMotionEvent' in window)) return;
+    shakeListenerInstalled = true;
+    window.addEventListener('devicemotion', (event) => {
+        const acc = event.acceleration;
+        const gravity = event.accelerationIncludingGravity;
+        let force = 0;
+        if (acc && [acc.x, acc.y, acc.z].every(Number.isFinite)) {
+            force = Math.hypot(acc.x, acc.y, acc.z);
+            if (force < 14) return;
+        } else if (gravity && [gravity.x, gravity.y, gravity.z].every(Number.isFinite)) {
+            const sample = [gravity.x, gravity.y, gravity.z];
+            if (previousGravitySample) {
+                force = Math.hypot(...sample.map((value, i) => value - previousGravitySample[i]));
             }
+            previousGravitySample = sample;
+            if (force < 16) return;
+        } else {
+            return;
         }
+
+        if (Date.now() - lastShakeTime < 2500) return;
+        const playActive = document.getElementById('tab-play')?.classList.contains('active');
+        const foodActive = document.getElementById('tab-food')?.classList.contains('active');
+        const spin = playActive ? window.pickRandom : foodActive ? window.pickRandomRestaurant : null;
+        if (!spin) return;
+
+        const modalOpen = ['login-overlay', 'result-overlay', 'memory-overlay'].some(id => {
+            const el = document.getElementById(id);
+            return el && el.style.display === 'flex';
+        });
+        if (modalOpen) return;
+
+        lastShakeTime = Date.now();
+        triggerHaptic(8);
+        setTimeout(() => triggerHaptic(14), 90);
+        setTimeout(() => {
+            triggerHaptic(20);
+            const tabStillActive = playActive
+                ? document.getElementById('tab-play')?.classList.contains('active')
+                : document.getElementById('tab-food')?.classList.contains('active');
+            if (tabStillActive) spin();
+        }, 190);
     });
+}
+
+function requestDeviceMotionAccess() {
+    if (!('DeviceMotionEvent' in window)) return;
+    if (shakeListenerInstalled) return;
+    const motionEvent = window.DeviceMotionEvent;
+    if (typeof motionEvent.requestPermission !== 'function') {
+        installShakeListener();
+        return;
+    }
+    motionEvent.requestPermission().then(permission => {
+        if (permission === 'granted') installShakeListener();
+    }).catch(() => {});
+}
+
+function initShakeToSpin() {
+    if (typeof window.DeviceMotionEvent?.requestPermission !== 'function') installShakeListener();
 }
 initShakeToSpin();
 setTimeout(checkBiometricButtonVisibility, 400);

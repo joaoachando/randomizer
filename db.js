@@ -23,24 +23,33 @@ const STARTER_CUISINES = [
     '🥐 Brunch/Cafe', '🥩 Steakhouse', '🦐 Seafood', '🍸 Bar/Tapas', '🍦 Dessert'
 ];
 
-// Automated Server-Side SQLite Backup (Keeps last 7 daily backups)
+// Automated Server-Side SQLite Backup (Keeps last 7 weekly backups)
 function runServerSideBackup() {
     try {
         if (!fs.existsSync(DB_PATH)) return;
         if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 
-        const dateStamp = new Date().toISOString().split('T')[0];
-        const destFile = path.join(BACKUP_DIR, `ideas-${dateStamp}.db.bak`);
-        if (!fs.existsSync(destFile)) {
-            fs.copyFileSync(DB_PATH, destFile);
-            console.log(`[P³ Backup] Saved daily backup: ${destFile}`);
-        }
-
         const files = fs.readdirSync(BACKUP_DIR)
             .filter(f => f.endsWith('.db.bak'))
             .sort()
             .reverse();
-        files.slice(7).forEach(oldFile => {
+        if (files.length > 0) {
+            const latest = fs.statSync(path.join(BACKUP_DIR, files[0])).mtimeMs;
+            if (Date.now() - latest < 7 * 86400000) return;
+        }
+
+        const dateStamp = new Date().toISOString().split('T')[0];
+        const destFile = path.join(BACKUP_DIR, `ideas-${dateStamp}.db.bak`);
+        if (!fs.existsSync(destFile)) {
+            fs.copyFileSync(DB_PATH, destFile);
+            console.log(`[P³ Backup] Saved weekly backup: ${destFile}`);
+        }
+
+        const backups = fs.readdirSync(BACKUP_DIR)
+            .filter(f => f.endsWith('.db.bak'))
+            .sort()
+            .reverse();
+        backups.slice(7).forEach(oldFile => {
             fs.unlinkSync(path.join(BACKUP_DIR, oldFile));
         });
     } catch (e) {
@@ -52,7 +61,7 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
     if (err) console.error(err.message);
     console.log('Connected to the P³ SQLite database.');
     runServerSideBackup();
-    setInterval(runServerSideBackup, 86400000); // Run every 24h
+    setInterval(runServerSideBackup, 7 * 86400000); // Run weekly
 });
 
 db.serialize(() => {
