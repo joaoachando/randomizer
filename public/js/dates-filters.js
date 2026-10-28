@@ -143,20 +143,44 @@ async function initAppOnLoad() {
 
 async function initAuth() {
     initChipUI();
-    if (userPassword && userName) {
-        try {
-            await apiFetch('/api/ideas');
-            document.getElementById('login-overlay').style.display = 'none';
-            const welcomeEl = document.getElementById('welcome-text');
-            welcomeEl.innerText = `👤 ${userName} ⇄`;
-            welcomeEl.style.display = 'inline-flex';
-            renderPlayChips();
-            fetchIdeas();
-            if (typeof initLdrHub === 'function') initLdrHub();
-            if (typeof fetchRestaurants === 'function') fetchRestaurants();
-            if (typeof checkDailyCheckInPrompt === 'function')  checkDailyCheckInPrompt();
-        } catch (e) {
-            console.error("Auth check failed", e);
+    const loginOverlay = document.getElementById('login-overlay');
+    if (!userName || !userPassword) {
+        loginOverlay.style.display = 'flex';
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/ideas', {
+            headers: {
+                'x-user-name': userName,
+                'x-user-password': userPassword
+            }
+        });
+        if (!res.ok) {
+            if (res.status === 401) {
+                userName = '';
+                userPassword = '';
+                localStorage.removeItem('userName');
+                localStorage.removeItem('userPassword');
+                showToast('Your saved login is no longer valid. Please sign in again.', true);
+            }
+            throw new Error(`Auth check failed with status ${res.status}`);
+        }
+
+        loginOverlay.style.display = 'none';
+        const welcomeEl = document.getElementById('welcome-text');
+        welcomeEl.innerText = `👤 ${userName} ⇄`;
+        welcomeEl.style.display = 'inline-flex';
+        renderPlayChips();
+        fetchIdeas();
+        if (typeof initLdrHub === 'function') initLdrHub();
+        if (typeof fetchRestaurants === 'function') fetchRestaurants();
+        if (typeof checkDailyCheckInPrompt === 'function') checkDailyCheckInPrompt();
+    } catch (e) {
+        console.error("Auth check failed", e);
+        loginOverlay.style.display = 'flex';
+        if (userName && userPassword) {
+            showToast('Could not verify your login. Please try again.', true);
         }
     }
 }
