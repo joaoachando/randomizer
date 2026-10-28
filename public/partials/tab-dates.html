@@ -1,0 +1,82 @@
+<!-- 2-TAB SEGMENTED NAVIGATION -->
+<div class="tabs-segmented" id="main-tabs">
+    <button class="tab-btn active" onclick="switchTab('play')" id="btn-play">🎲 Dates</button>
+    <button class="tab-btn" onclick="switchTab('food')" id="btn-food">🍽️ Restaurants</button>
+</div>
+
+<div id="tab-play" class="tab-content active">
+    <div id="pinned-date-banner" class="card pinned-banner" style="display: none;"></div>
+
+    <!-- HERO DATE ROULETTE CARD -->
+    <div class="card hero-date-card">
+        <div class="hero-kicker">✨ DATE NIGHT ROULETTE</div>
+        <h2 class="hero-title">Ready for a Date?</h2>
+        <p class="hero-subtitle">Spin a surprise idea right now (or shake your phone!), or tailor the vibe below.</p>
+
+        <div class="filter-toggle-bar" onclick="toggleFilterDrawer()">
+            <span id="filter-toggle-text">🎛️ Customize Vibe & Filters</span>
+            <span id="filter-chevron" style="font-size: 11px; opacity: 0.65; transition: 0.2s;">▼ Show</span>
+        </div>
+
+        <div id="filter-drawer" class="filter-drawer">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 11px; opacity: 0.6;">Tap to filter • Leave blank for "Any"</span>
+                <button class="reset-btn" onclick="resetFilters()">Reset All</button>
+            </div>
+            <div id="play-filters-container"></div>
+        </div>
+
+        <div class="hero-action-row">
+            <button class="cta-btn hero-cta" onclick="pickRandom()">🎲 Pick For Us!</button>
+            <button class="hero-secondary-btn" onclick="toggleDateFormDrawer()" id="date-form-toggle-btn">➕ New Idea</button>
+        </div>
+    </div>
+
+    <!-- COLLAPSIBLE ADD / EDIT DATE IDEA DRAWER -->
+    <div id="date-form-drawer" class="card" style="display: none; border: 1.5px solid var(--accent);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 id="date-form-title" style="margin: 0; font-size: 17px;">✨ Add New Date Idea</h3>
+            <button class="reset-btn" onclick="toggleDateFormDrawer()">✖</button>
+        </div>
+        <input type="text" id="n-title" placeholder="Activity title (e.g. Sunset Picnic, Blanket Fort)..." oninput="checkIdeaDuplicate(this.value)" required>
+        <div id="n-dup-warning" class="dup-warn-pill" style="display: none;"></div>
+
+        <textarea id="n-description" placeholder="Optional: Specific links, notes, or details..."></textarea>
+        <input type="text" id="n-trip" list="trip-folder-suggestions" placeholder="✈️ Optional Trip Folder (e.g. Summer Lisbon Trip)">
+
+        <div id="add-filters-container" style="margin-top: 10px;"></div>
+
+        <div class="toggle-grid">
+            <label class="toggle-box spicy-toggle">
+                <span>🌶️ Spicy</span>
+                <input type="checkbox" id="n-spicy">
+                <span class="switch-pill"></span>
+            </label>
+            <label class="toggle-box">
+                <span>👀 Secret Idea</span>
+                <input type="checkbox" id="n-secret">
+                <span class="switch-pill"></span>
+            </label>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <button class="reset-btn" onclick="toggleDateFormDrawer()" style="flex: 1; padding: 12px;">Cancel</button>
+            <button id="add-btn" class="cta-btn" onclick="addIdea()" style="flex: 2; margin: 0; padding: 12px;">💾 Save Idea</button>
+        </div>
+    </div>
+
+    <!-- MASTER DATE LIST & CHRONOLOGICAL SCRAPBOOK -->
+    <div class="card">
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <input type="text" id="search-ideas" placeholder="🔍 Search dates, trips, memories..." onkeyup="renderList()" style="margin: 0; flex: 1;">
+            <select id="sort-ideas" onchange="renderList()" style="margin: 0; width: auto; padding: 10px;">
+                <option value="newest">Newest</option>
+                <option value="az">A-Z</option>
+                <option value="memories">📖 Scrapbook Timeline</option>
+                <option value="spicy">🌶️ Spicy</option>
+            </select>
+        </div>
+        <div id="master-quick-filters" class="chip-row" style="margin-bottom: 8px;"></div>
+        <div id="master-trip-filters" class="chip-row" style="margin-bottom: 12px;"></div>
+        <ul id="idea-ul" class="idea-list"></ul>
+    </div>
+</div>

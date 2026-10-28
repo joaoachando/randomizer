@@ -1,0 +1,139 @@
+<div id="tab-food" class="tab-content">
+    <!-- CENTERED HERO FOODIE ROULETTE CARD -->
+    <div class="card hero-date-card">
+        <div class="hero-kicker">🍽️ FOODIE & RECIPE BUCKET LIST</div>
+        <h2 id="food-mode-heading" class="hero-title">Where Are We Eating?</h2>
+        <p class="hero-subtitle">Pick a city below, switch to Map View, or spin a random spot.</p>
+
+        <div id="food-city-pills" class="chip-row city-pill-row"></div>
+
+        <!-- COLLAPSIBLE EXTRA FILTERS (TYPE, CUISINE, TRIP) -->
+        <div class="filter-toggle-bar" onclick="document.getElementById('food-extra-filters').classList.toggle('open')">
+            <span>🎛️ Filter by Spot Type, Cuisine or Trip</span>
+            <span style="font-size: 11px; opacity: 0.65;">▼ Show</span>
+        </div>
+
+        <div id="food-extra-filters" class="filter-drawer">
+            <span class="filter-label">✨ Spot Type</span>
+            <div id="food-type-pills" class="chip-row" style="margin-bottom: 10px;">
+                <label class="chip active" id="type-chip-all"><input type="checkbox" switch class="ios-taptic" onchange="setFoodFilter('type', 'all')">🌟 Everything</label>
+                <label class="chip" id="type-chip-dining"><input type="checkbox" switch class="ios-taptic" onchange="setFoodFilter('type', 'dining')">🍽️ Restaurants & Bars</label>
+                <label class="chip" id="type-chip-cafe"><input type="checkbox" switch class="ios-taptic" onchange="setFoodFilter('type', 'cafe')">☕ Coffee & Pastry</label>
+                <label class="chip" id="type-chip-cook"><input type="checkbox" switch class="ios-taptic" onchange="setFoodFilter('type', 'cook')">👨‍🍳 Cook at Home</label>
+            </div>
+
+            <div id="food-trip-filter-wrap" style="display: none; margin-bottom: 10px;">
+                <span class="filter-label">✈️ Trip Planner Folder</span>
+                <div id="food-trip-pills" class="chip-row"></div>
+            </div>
+
+            <span class="filter-label">🍝 Cuisine</span>
+            <div id="food-cuisine-filter-pills" class="chip-row"></div>
+        </div>
+
+        <div class="hero-action-row">
+            <button class="cta-btn hero-cta" id="food-spin-btn" onclick="pickRandomRestaurant()">🎰 Spin a Spot!</button>
+            <button class="hero-secondary-btn" onclick="toggleFoodFormDrawer()" id="food-form-toggle-btn">➕ Add Spot</button>
+        </div>
+    </div>
+
+    <!-- COLLAPSIBLE ADD / EDIT RESTAURANT FORM -->
+    <div id="food-form-drawer" class="card" style="display: none; border: 1.5px solid var(--accent);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 id="food-form-title" style="margin: 0; font-size: 17px;">➕ Save New Food Spot</h3>
+            <button class="reset-btn" onclick="toggleFoodFormDrawer()">✖</button>
+        </div>
+
+        <span class="filter-label">📍 Paste Google Maps Link (Auto-Fills Name, Neighborhood & City!)</span>
+        <input type="text" id="r-maps" placeholder="Paste https://maps.app.goo.gl/... to auto-fill" onchange="autoFillFromMapsLink()" onpaste="setTimeout(autoFillFromMapsLink, 120)">
+
+        <span class="filter-label" style="margin-top: 4px;">Spot or Recipe Name</span>
+        <input type="text" id="r-name" placeholder="e.g. Ramiro, Bacalhau à Brás..." oninput="checkRestaurantDuplicate(this.value)">
+        <div id="r-dup-warning" class="dup-warn-pill" style="display: none;"></div>
+
+        <div class="filters-grid" style="margin-bottom: 4px;">
+            <div>
+                <span class="filter-label">City / Area</span>
+                <input type="text" id="r-city" list="city-suggestions" placeholder="e.g. Lisbon, DC, Home...">
+                <datalist id="city-suggestions"></datalist>
+            </div>
+            <div>
+                <span class="filter-label">🏘️ Neighborhood (Optional)</span>
+                <input type="text" id="r-neighborhood" placeholder="e.g. Chiado, Georgetown...">
+            </div>
+        </div>
+
+        <div class="filters-grid" style="margin-bottom: 6px;">
+            <div>
+                <span class="filter-label">Spot Category</span>
+                <select id="r-spot-type" style="margin: 6px 0;">
+                    <option value="dining">🍽️ Restaurant / Bar</option>
+                    <option value="cafe">☕ Coffee / Pastry / Brunch</option>
+                    <option value="cook">👨‍🍳 Cook Together at Home</option>
+                </select>
+            </div>
+            <div>
+                <span class="filter-label">✈️ Trip Folder (Optional)</span>
+                <input type="text" id="r-trip" list="trip-folder-suggestions" placeholder="e.g. Summer Trip">
+                <datalist id="trip-folder-suggestions"></datalist>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; margin-bottom: 6px;">
+            <span class="filter-label" style="margin-bottom: 0;">Cuisine Type</span>
+            <button id="edit-cuisines-btn" class="reset-btn" onclick="toggleEditCuisineTags()">✏️ Edit Cuisines</button>
+        </div>
+        <div id="r-cuisine-chips" class="chip-row" style="margin-bottom: 8px;"></div>
+
+        <div style="display: flex; gap: 6px; margin-bottom: 12px; align-items: center;">
+            <input type="text" id="custom-cuisine-input" placeholder="+ New cuisine (e.g. 🍜 Ramen)..." style="margin: 0; padding: 9px 12px; font-size: 12.5px; flex: 1;">
+            <button class="reset-btn" onclick="addCustomCuisineTag()" style="padding: 9px 14px;">➕ Add</button>
+        </div>
+
+        <div class="filters-grid">
+            <div><span class="filter-label">Vibe</span><div id="r-vibe-chips" class="chip-row"></div></div>
+            <div><span class="filter-label">Price</span><div id="r-price-chips" class="chip-row"></div></div>
+        </div>
+
+        <div class="filters-grid" style="margin-top: 4px;">
+            <div>
+                <span class="filter-label">📱 TikTok / IG Reel Link (Auto-Thumb)</span>
+                <input type="text" id="r-social" placeholder="https://tiktok.com/..." onchange="autoFetchSocialThumb()" onpaste="setTimeout(autoFetchSocialThumb, 120)">
+            </div>
+            <div>
+                <span class="filter-label">Must-Order Dishes / Ingredients</span>
+                <input type="text" id="r-notes" placeholder="e.g. Croquetes, garlic prawns...">
+            </div>
+        </div>
+
+        <div id="r-thumb-preview-box" style="display: none; align-items: center; gap: 10px; margin-top: 4px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 12px;">
+            <img id="r-thumb-preview-img" src="" alt="Preview" style="width: 44px; height: 58px; object-fit: cover; border-radius: 8px;">
+            <span style="font-size: 11.5px; opacity: 0.8; flex: 1;">🎬 Video thumbnail attached!</span>
+            <button class="reset-btn" onclick="clearPendingThumb()" style="padding: 3px 8px;">✖</button>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button class="reset-btn" onclick="toggleFoodFormDrawer()" style="flex: 1; padding: 12px;">Cancel</button>
+            <button id="r-save-btn" class="cta-btn" onclick="saveRestaurant()" style="flex: 2; margin: 0; padding: 12px;">💾 Save Spot</button>
+        </div>
+    </div>
+
+    <!-- MASTER RESTAURANT LIST & INTERACTIVE DARK-MODE PIN MAP -->
+    <div class="card">
+        <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="search-food" placeholder="🔍 Search spots, neighborhoods, dishes..." onkeyup="renderRestaurantList()" style="margin: 0; flex: 1; min-width: 150px;">
+            <select id="filter-food-status" onchange="renderRestaurantList()" style="margin: 0; width: auto; padding: 10px;">
+                <option value="all">All Spots</option>
+                <option value="todo">📍 To Try</option>
+                <option value="visited">✅ Visited</option>
+            </select>
+            <button class="reset-btn" id="btn-toggle-map" onclick="toggleFoodMapView()" style="padding: 10px 13px; font-weight: 700;">🗺️ Map</button>
+        </div>
+
+        <div id="food-map-wrap" class="food-map-wrap" style="display: none;">
+            <div id="food-leaflet-map" style="width: 100%; height: 320px; border-radius: 16px;"></div>
+        </div>
+
+        <ul id="food-ul" class="idea-list"></ul>
+    </div>
+</div>

@@ -1,0 +1,118 @@
+/* PATTERN ENGINE: SUB-PILLS, 7-DAY RADAR & CONFIDENCE BARS */
+.pattern-nav-pills {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.pattern-nav-btn {
+    flex: 1;
+    padding: 7px 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-base);
+    color: var(--text-main);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: 0.15s;
+}
+.pattern-nav-btn.active {
+    background: var(--accent);
+    color: var(--bg-base);
+    border-color: var(--accent);
+    opacity: 1;
+}
+
+.radar-strip-wrap { margin-bottom: 12px; }
+.radar-strip {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    text-align: center;
+}
+.radar-day-box {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 6px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.radar-day-box.has-pred {
+    border-color: rgba(245, 158, 11, 0.55);
+    background: rgba(245, 158, 11, 0.07);
+}
+.radar-day-box.pred-period {
+    border-color: rgba(239, 68, 68, 0.65);
+    background: rgba(239, 68, 68, 0.1);
+}
+.radar-day-lbl { font-size: 9.5px; font-weight: 700; opacity: 0.75; }
+.radar-cday { font-size: 9px; opacity: 0.5; }
+.radar-icons {
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 12px;
+}
+
+.pattern-tip-box {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 2.5px solid #fbbf24;
+    font-size: 11.5px;
+    line-height: 1.35;
+}
+
+.conf-bar-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.conf-bar-track {
+    flex: 1; height: 6px; background: var(--bg-card);
+    border-radius: 4px; overflow: hidden; border: 1px solid var(--border);
+}
+.conf-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+.conf-bar-lbl { font-size: 10.5px; font-weight: 700; opacity: 0.75; white-space: nowrap; }
+
+/* PMS SIGNATURE BANNER, CALENDAR SYMPTOM HIGHLIGHTER & DOCTOR MODAL */
+.pms-sig-banner {
+    border: 1.5px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+    padding: 13px 16px;
+}
+.cal-highlight-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 11px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid #f59e0b;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fbbf24;
+}
+.cal-day.sym-highlight, .mini-day.sym-highlight {
+    box-shadow: 0 0 0 2px #fbbf24, 0 0 10px rgba(251, 191, 36, 0.45) !important;
+    border-color: #fbbf24 !important;
+}
+#doctor-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    z-index: 2100; display: none; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;
+}
+.doc-summary-box {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    max-height: 62vh;
+    overflow-y: auto;
+}

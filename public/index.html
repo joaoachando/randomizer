@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e1e2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="P³">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P³</title>
+
+    <!-- CUSTOM TYPOGRAPHY & LEAFLET MAP CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- SHARED THEME & MICRO-CSS FILES -->
+    <link rel="stylesheet" href="https://achando.dev/shared/theme.css">
+    <link rel="stylesheet" href="/css/base.css">
+    <link rel="stylesheet" href="/css/components.css">
+    <link rel="stylesheet" href="/css/tracker-hero.css">
+    <link rel="stylesheet" href="/css/tracker-cal.css">
+    <link rel="stylesheet" href="/css/tracker-widgets.css">
+    <link rel="stylesheet" href="/css/tracker-patterns.css">
+    <script src="https://achando.dev/shared/theme-sync.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+
+<div id="app-modals"></div>
+<div id="app-hub"></div>
+<div id="app-dates"></div>
+<div id="app-restaurants"></div>
+<div id="app-tracker"></div>
+
+<script>
+    async function bootApp() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+
+        const parts = [
+            ['app-modals', '/partials/modals.html'],
+            ['app-hub', '/partials/hub-banner.html'],
+            ['app-dates', '/partials/tab-dates.html'],
+            ['app-restaurants', '/partials/tab-restaurants.html'],
+            ['app-tracker', '/partials/tab-tracker.html']
+        ];
+        await Promise.all(parts.map(async ([id, url]) => {
+            const res = await fetch(url);
+            document.getElementById(id).innerHTML = await res.text();
+        }));
+
+        const scripts = [
+            '/js/ui-utils.js',
+            '/js/ldr-hub.js',
+            '/js/wrapped-badges.js',
+            '/js/dates-filters.js',
+            '/js/dates-list.js',
+            '/js/dates-modals.js',
+            '/js/restaurants-app.js',
+            '/js/tracker-state.js',
+            '/js/tracker-checkin.js',
+            '/js/tracker-cycles-crud.js',
+            '/js/tracker-logs-crud.js',
+            '/js/tracker-stats.js',
+            '/js/tracker-anomalies.js',
+            '/js/tracker-patterns-math.js',
+            '/js/tracker-patterns-links.js',
+            '/js/tracker-patterns-ui.js',
+            '/js/tracker-extras.js',
+            '/js/tracker-history.js',
+            '/js/tracker-cal-grid.js',
+            '/js/tracker-cal-chips.js',
+            '/js/tracker-hero.js',
+            '/js/tracker-breather.js'
+        ];
+        for (const src of scripts) {
+            await new Promise(resolve => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                document.body.appendChild(s);
+            });
+        }
+        if (typeof initAppOnLoad === 'function') initAppOnLoad();
+        if (typeof initCalendarSwipe === 'function') initCalendarSwipe();
+    }
+    bootApp();
+</script>
+</body>
+</html>

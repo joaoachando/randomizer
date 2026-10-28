@@ -1,0 +1,224 @@
+<div id="tab-tracker" class="tab-content" style="padding-bottom: 70px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <button class="reset-btn" onclick="switchTab('play')" style="font-weight: 700;">← Back to Dates & Food</button>
+        <span style="font-size: 11px; font-weight: 700; opacity: 0.6;">🌙 Jenna's Cycle Space</span>
+    </div>
+
+    <div id="breast-exam-banner" class="card exam-banner" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+                <div style="font-weight: 700; font-size: 14px; color: #f472b6; margin-bottom: 3px;">🌸 Optimal Self-Check Window (Cycle Day <span id="exam-cycle-day">7</span>)</div>
+                <div style="font-size: 12px; opacity: 0.85;">Hormonal swelling is at its lowest right after your period—ideal for a quick monthly self-exam.</div>
+            </div>
+            <button class="reset-btn" onclick="markBreastExamDone()" style="border-color: #f472b6; color: #f472b6; font-weight: 700;">✅ Done</button>
+        </div>
+    </div>
+
+    <div id="pms-signature-banner" class="card pms-sig-banner" style="display: none;"></div>
+
+    <div id="cycle-hero-card" class="card hero-phase-card" style="text-align: center; padding: 20px 18px;">
+        <div style="display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px;">
+            <div id="cycle-phase-pill" class="phase-pill" style="margin-bottom: 0;">🌙 Cycle Tracker</div>
+            <span id="cycle-avg-badge" class="phase-pill" style="margin-bottom: 0; background: var(--accent); color: var(--bg-base); border-color: var(--accent);">Avg: 28 days</span>
+        </div>
+        <div id="cycle-headline" style="font-size: 24px; font-weight: 800; color: var(--accent); margin: 6px 0 4px 0;">No data yet</div>
+        <div id="cycle-subline" style="font-size: 13px; opacity: 0.85; margin-bottom: 12px;">Log your last period to see predictions.</div>
+
+        <div id="phase-progress-wrap" style="display: none; margin: 24px 0 16px 0; text-align: left;">
+            <div class="phase-bar">
+                <div id="seg-menstrual" class="phase-seg seg-menstrual" style="width: 18%;"></div>
+                <div id="seg-follicular" class="phase-seg seg-follicular" style="width: 28%;"></div>
+                <div id="seg-ovulation" class="phase-seg seg-ovulation" style="width: 18%;"></div>
+                <div id="seg-luteal" class="phase-seg seg-luteal" style="width: 36%;"></div>
+                <div id="phase-marker" class="phase-marker" style="left: 10%;">
+                    <div id="phase-marker-tag" class="phase-marker-tag">Day 1</div>
+                    <div class="phase-marker-orb"></div>
+                </div>
+            </div>
+            <div class="phase-bar-labels">
+                <span id="lbl-menstrual">🩸 Period</span>
+                <span id="lbl-follicular">🌱 Follicular</span>
+                <span id="lbl-ovulation">✨ Ovulation</span>
+                <span id="lbl-luteal">🌙 Luteal</span>
+            </div>
+        </div>
+
+        <button id="smart-period-btn" class="cta-btn" onclick="handleSmartPeriodAction()" style="margin-top: 0; padding: 12px;">
+            🩸 Period Started Today
+        </button>
+    </div>
+
+    <!-- SUBVIEW 1: CALENDAR & DAILY CHECK-IN -->
+    <div id="tracker-view-cal" class="tracker-subview active">
+        <div class="card" id="cal-swipe-card">
+            <div class="cal-header">
+                <div style="display: flex; gap: 4px;">
+                    <button class="reset-btn" onclick="changeCalNav(-1)">◀</button>
+                    <button class="reset-btn" onclick="jumpCalendarToToday()">Today</button>
+                    <button class="reset-btn" onclick="changeCalNav(1)">▶</button>
+                </div>
+                <h3 id="cal-month-title" style="margin: 0; font-size: 15px;">Month Year</h3>
+                <button id="year-view-toggle-btn" class="reset-btn" onclick="toggleYearHeatmap()">🗓️ Year</button>
+            </div>
+
+            <div id="cal-sym-filter-bar" class="cal-highlight-bar" style="display: none;"></div>
+
+            <div id="single-month-cal-wrap">
+                <div class="cal-grid">
+                    <div class="cal-day-name">S</div><div class="cal-day-name">M</div><div class="cal-day-name">T</div>
+                    <div class="cal-day-name">W</div><div class="cal-day-name">T</div><div class="cal-day-name">F</div><div class="cal-day-name">S</div>
+                </div>
+                <div id="cal-days-grid" class="cal-grid" style="margin-top: 4px;"></div>
+            </div>
+
+            <div id="year-heatmap-wrap" class="year-heatmap-grid" style="display: none;"></div>
+
+            <div class="cal-legend">
+                <span><i style="width:10px;height:10px;background:rgba(239,68,68,0.45);border:1px solid #ef4444;border-radius:3px;display:inline-block;"></i> Period</span>
+                <span><i style="width:10px;height:10px;border:1px dashed #ef4444;border-radius:3px;display:inline-block;"></i> Predicted</span>
+                <span><i style="width:10px;height:10px;background:rgba(59,130,246,0.3);border:1px solid #60a5fa;border-radius:3px;display:inline-block;"></i> Fertile</span>
+                <span><i style="width:6px;height:6px;background:var(--accent);border-radius:50%;display:inline-block;"></i> Symptom</span>
+                <span><i style="width:6px;height:6px;background:#ec4899;border-radius:50%;display:inline-block;"></i> Intimacy</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="selected-day-header">
+                <div>
+                    <span class="filter-label" style="margin-bottom: 2px;">Selected Day</span>
+                    <h3 id="selected-log-date-label" class="selected-day-title">Today</h3>
+                </div>
+                <div class="selected-day-actions">
+                    <button id="selected-day-period-btn" class="reset-btn period-start-chip" onclick="quickStartPeriodOnSelected()">
+                        🩸 Started Today
+                    </button>
+                    <button id="clear-daily-log-btn" class="reset-btn" onclick="clearDailyLog()" style="display: none; padding: 6px 10px;" title="Clear day">🗑️</button>
+                </div>
+            </div>
+
+            <span class="filter-label">Flow Intensity (Tap ✨ None when period ends)</span>
+            <div id="daily-flow-chips" class="flow-segmented-grid" style="margin-bottom: 14px;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span class="filter-label" style="margin-bottom: 0;">Symptoms & Habits (Tap 1x–3x for intensity)</span>
+                <button class="reset-btn" onclick="document.getElementById('tag-manager-drawer').classList.toggle('open')" style="padding: 3px 9px; font-size: 11px;">⚙️ Manage Tags</button>
+            </div>
+
+            <div id="daily-symptom-chips" class="chip-row" style="margin-bottom: 10px;"></div>
+
+            <!-- COLLAPSIBLE TAG MANAGER DRAWER -->
+            <div id="tag-manager-drawer" class="filter-drawer" style="margin-bottom: 10px;">
+                <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px;">
+                    <input type="text" id="custom-sym-input" placeholder="+ New tag (e.g. 🫧 Breakout)..." style="margin: 0; padding: 8px 11px; font-size: 12px; flex: 1;">
+                    <button id="new-tag-type-btn" class="reset-btn" onclick="toggleNewTagSeverityMode()">📈 1-3 Dots</button>
+                    <button class="reset-btn" onclick="addCustomSymptomTag()" style="color: var(--accent); border-color: var(--accent);">➕ Add</button>
+                </div>
+                <button id="edit-tags-btn" class="reset-btn" onclick="toggleEditSymptomTags()" style="width: 100%; padding: 7px;">✏️ Tap to Remove Existing Tags</button>
+            </div>
+
+            <span class="filter-label" style="margin-top: 8px;">Intimacy, Contraception & LH Tests (Private)</span>
+            <div id="daily-intimacy-chips" class="chip-row" style="margin-bottom: 12px;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span class="filter-label" style="margin-bottom: 0;">Daily Notes</span>
+                <span id="daily-save-status" class="autosave-pill">✓ Auto-saves</span>
+            </div>
+            <input type="text" id="daily-log-notes" placeholder="Type a note (saves automatically)..." oninput="debouncedNoteSave()" style="margin-bottom: 0;">
+        </div>
+    </div>
+
+    <!-- SUBVIEW 2: COMPACT INSIGHTS & CALM -->
+    <div id="tracker-view-insights" class="tracker-subview">
+        <div class="card">
+            <h3 style="margin: 0 0 8px 0; font-size: 16px;">🧠 Symptom Patterns & Heads-Up</h3>
+            <div id="symptom-patterns-box" style="font-size: 13px; opacity: 0.85;">Log daily symptoms on the calendar to detect your personal cycle patterns.</div>
+        </div>
+
+        <!-- COMPACT 4-TOOL SWITCHER (PREVENTS LONG SCROLLING) -->
+        <div class="card">
+            <div class="pattern-nav-pills" style="margin-bottom: 12px;">
+                <button class="pattern-nav-btn active" id="itool-btn-care" onclick="switchInsightTool('care')">🧴 Self-Care</button>
+                <button class="pattern-nav-btn" id="itool-btn-trip" onclick="switchInsightTool('trip')">✈️ Trip Check</button>
+                <button class="pattern-nav-btn" id="itool-btn-breath" onclick="switchInsightTool('breath')">🌬️ Breather</button>
+                <button class="pattern-nav-btn" id="itool-btn-health" onclick="switchInsightTool('health')">🔔 Health</button>
+            </div>
+
+            <div id="itool-care">
+                <div id="cycle-phase" style="font-size: 13.5px; font-weight: 700; margin-bottom: 8px;">Log a period to see your current phase.</div>
+                <div id="cycle-skincare" style="font-size: 13px; opacity: 0.88; line-height: 1.45; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 12px; display: none;"></div>
+            </div>
+
+            <div id="itool-trip" style="display: none;">
+                <p style="font-size: 12px; opacity: 0.75; margin: 0 0 10px 0;">Project future visit or vacation dates to see cycle phases & period risk.</p>
+                <div class="filters-grid" style="margin-bottom: 8px;">
+                    <div><span class="filter-label">Arrival Date</span><input type="date" id="trip-start-input" onchange="runTripPhasePredictor()"></div>
+                    <div><span class="filter-label">Departure Date</span><input type="date" id="trip-end-input" onchange="runTripPhasePredictor()"></div>
+                </div>
+                <div id="trip-predictor-results" style="font-size: 12.5px;"></div>
+            </div>
+
+            <div id="itool-breath" style="display: none; text-align: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 13px; font-weight: 700;">4s Inhale • 4s Hold • 6s Exhale</span>
+                    <span id="breath-timer-label" class="badge user-badge">2:00</span>
+                </div>
+                <div class="breathing-stage">
+                    <div id="breathing-aura" class="breathing-aura"></div>
+                    <div id="breathing-circle" class="breathing-circle">
+                        <div id="breathing-text" style="font-size: 13px; font-weight: 800;">Ready</div>
+                        <div id="breathing-phase-sec" style="font-size: 18px; font-weight: 900; margin-top: 2px;"></div>
+                    </div>
+                </div>
+                <button id="breath-toggle-btn" class="cta-btn" onclick="toggleBreathingPacer()" style="margin-top: 8px; padding: 12px; font-size: 14px;">▶️ Start 2-Minute Session</button>
+            </div>
+
+            <div id="itool-health" style="display: none;">
+                <div id="cycle-anomalies-box" style="font-size: 13px; opacity: 0.85;">Log your cycles to monitor for length, bleed, or spotting anomalies.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUBVIEW 3: HISTORY & DOCTOR SUMMARY -->
+    <div id="tracker-view-history" class="tracker-subview">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; font-size: 16px;">🩺 Doctor Visit Quick-Stats</h3>
+                <button class="reset-btn" onclick="openDoctorSummaryModal()" style="border-color: var(--accent); color: var(--accent); font-weight: 700;">📋 Doctor Summary</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-box"><span class="filter-label">Last Period (LMP)</span><div id="stat-lmp" class="stat-val">-</div></div>
+                <div class="stat-box"><span class="filter-label">Avg Bleed Length</span><div id="stat-bleed" class="stat-val">-</div></div>
+                <div class="stat-box"><span class="filter-label">Weighted Avg Cycle</span><div id="stat-cycle" class="stat-val">28 days</div></div>
+                <div class="stat-box"><span class="filter-label">Regularity</span><div id="stat-reg" class="stat-val">-</div></div>
+            </div>
+            <div id="cycle-trend-wrap" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); display: none;">
+                <span class="filter-label" style="margin-bottom: 8px;">📊 Recent Cycle Lengths (Last 6 Intervals)</span>
+                <div id="cycle-trend-chart" class="cycle-trend-chart"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 16px;">📅 Full Cycle & PMS History</h3>
+                <button class="reset-btn" onclick="toggleManualCycleDrawer()" id="manual-cycle-toggle-btn">➕ Add Past Date</button>
+            </div>
+            <div id="manual-cycle-drawer" class="filter-drawer" style="margin-bottom: 14px;">
+                <h4 style="margin: 4px 0 8px 0; font-size: 14px;" id="cycle-form-title">Log Past Period Range</h4>
+                <div class="filters-grid">
+                    <div><span class="filter-label">Start Date</span><input type="date" id="c-start"></div>
+                    <div><span class="filter-label">End Date (Optional)</span><input type="date" id="c-end"></div>
+                </div>
+                <input type="text" id="c-notes" placeholder="Optional cycle summary notes...">
+                <button id="c-save-btn" class="cta-btn" onclick="saveCycle()" style="padding: 11px; font-size: 14px;">💾 Save Period</button>
+            </div>
+            <ul id="cycle-ul" class="idea-list"></ul>
+        </div>
+    </div>
+
+    <!-- FLOATING BOTTOM GLASS DOCK (ALWAYS REACHABLE WITHOUT SCROLLING) -->
+    <div class="sub-tabs-floating">
+        <button id="sub-btn-cal" class="sub-tab-btn active" onclick="switchTrackerSubTab('cal')">📅 Calendar</button>
+        <button id="sub-btn-insights" class="sub-tab-btn" onclick="switchTrackerSubTab('insights')">✨ Insights</button>
+        <button id="sub-btn-history" class="sub-tab-btn" onclick="switchTrackerSubTab('history')">🩺 History</button>
+    </div>
+</div>

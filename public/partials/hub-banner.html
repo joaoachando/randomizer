@@ -1,0 +1,199 @@
+<div id="ldr-hub-container" class="ldr-sticky-wrap">
+    <!-- BESPOKE TOP APP BAR -->
+    <header class="p3-topbar">
+        <div class="p3-brand">
+            <span class="p3-logo" onclick="switchTab('play')">P³</span>
+            <span class="p3-couple-tag" onclick="openSecretTracker()" title="Secret Tracker">for Jenna & João 🤍</span>
+            <span id="jenna-active-pill" class="jenna-active-badge" style="display: none;" title="Jenna's last activity"></span>
+        </div>
+
+        <div class="p3-actions">
+            <span id="welcome-text" class="p3-icon-pill" onclick="logout()" title="Switch user" style="display: none;"></span>
+
+            <button class="p3-icon-btn" onclick="togglePushNotifications()" id="btn-push-perm" title="Toggle Notifications">
+                <span id="push-dot" class="status-dot off"></span>
+                <span id="push-label">🔔</span>
+            </button>
+
+            <div class="theme-picker" id="themePicker">
+                <button class="p3-icon-btn" onclick="toggleThemePicker(event)" title="Change Theme">🎨</button>
+                <div class="theme-picker-menu">
+                    <div class="theme-category">Dark Modes</div>
+                    <div class="theme-option" data-theme="catppuccin" onclick="setTheme('catppuccin')">☕ Catppuccin</div>
+                    <div class="theme-option" data-theme="nord" onclick="setTheme('nord')">❄️ Nord</div>
+                    <div class="theme-option" data-theme="dracula" onclick="setTheme('dracula')">🧛 Dracula</div>
+                    <div class="theme-option" data-theme="tokyonight" onclick="setTheme('tokyonight')">🏙️ Tokyo Night</div>
+                    <div class="theme-category">Light Modes</div>
+                    <div class="theme-option" data-theme="latte" onclick="setTheme('latte')">🥛 Latte</div>
+                    <div class="theme-option" data-theme="solarized" onclick="setTheme('solarized')">☀️ Solarized</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- FLIGHT-BRIDGE DUAL CLOCK, DISTANCE & COUNTDOWN WIDGET -->
+    <div class="ldr-dock">
+        <div class="ldr-bridge-grid" onclick="toggleHubDrawer('settings')" title="Tap to edit visit countdown, flight & cities">
+            <div class="ldr-city-col" id="city-col-joao">
+                <span class="ldr-city-name">LISBON</span>
+                <div class="ldr-city-time"><span class="skeleton-shimmer" style="width:58px;height:20px;"></span></div>
+                <span class="ldr-city-weather"><span class="skeleton-shimmer" style="width:42px;height:12px;"></span></span>
+            </div>
+
+            <div class="ldr-flight-center">
+                <div class="ldr-countdown-tag" id="countdown-label-top">NEXT VISIT</div>
+                <div class="ldr-flight-line">
+                    <span class="flight-dot"></span>
+                    <div class="flight-track-rail">
+                        <span id="flight-plane-icon" class="flight-plane-moving" style="left: 50%;">✈️</span>
+                    </div>
+                    <span class="flight-dot"></span>
+                </div>
+                <div id="countdown-text" class="ldr-countdown-mono">Set Date</div>
+                <div class="ldr-sub-telemetry">
+                    <span id="flight-distance-pill">🌍 Calculating...</span>
+                    <a id="flight-number-pill" href="#" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display: none;"></a>
+                </div>
+            </div>
+
+            <div class="ldr-city-col right" id="city-col-jenna">
+                <span class="ldr-city-name">FAIRFAX</span>
+                <div class="ldr-city-time"><span class="skeleton-shimmer" style="width:58px;height:20px;"></span></div>
+                <span class="ldr-city-weather"><span class="skeleton-shimmer" style="width:42px;height:12px;"></span></span>
+            </div>
+        </div>
+
+        <div class="ldr-dock-footer">
+            <button class="ldr-daily-bar" onclick="toggleHubDrawer('daily')" id="btn-hub-daily">
+                <span class="ldr-daily-left">
+                    <span class="daily-sparkle">💬</span>
+                    <span>Daily "Us"</span>
+                </span>
+                <span id="daily-bar-badge" class="ldr-status-chip">Tap to answer</span>
+            </button>
+
+            <button class="ldr-prep-btn" onclick="toggleHubDrawer('prep')" id="btn-hub-prep" title="Things to Bring, Get & Have Ready">
+                📋 Prep <span id="prep-count-badge">0</span>
+            </button>
+
+            <button class="ldr-wrapped-btn" onclick="openWrappedModal()" id="btn-hub-wrapped" style="display: none;">
+                🏆 Wrapped
+            </button>
+        </div>
+    </div>
+
+    <!-- DRAWER 1: DAILY "US" QUESTION + REACTIONS + ARCHIVE -->
+    <div id="hub-drawer-daily" class="card ldr-drawer" style="display: none;">
+        <div class="ldr-drawer-header">
+            <span class="ldr-drawer-tag">✨ DAILY "US" PROMPT</span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="reset-btn" onclick="toggleCurrentPromptStar()" id="btn-star-current" style="padding: 3px 8px; font-size: 12px; display: none;" title="Star this prompt">☆</button>
+                <button class="reset-btn" onclick="toggleDailyHistoryView()" id="btn-daily-archive" style="padding: 3px 9px; font-size: 11px;">📖 Archive (0)</button>
+                <button class="ldr-close-btn" onclick="toggleHubDrawer('daily')">✖</button>
+            </div>
+        </div>
+
+        <div id="daily-active-view">
+            <div id="daily-q-text" class="daily-question-banner">
+                <span class="skeleton-shimmer" style="width: 85%; height: 16px;"></span>
+            </div>
+            <div id="daily-q-Status" class="daily-cards-grid"></div>
+            <div class="daily-input-capsule">
+                <input type="text" id="daily-q-input" placeholder="Write your answer..." onkeydown="if(event.key==='Enter') submitDailyAnswer()">
+                <button id="daily-send-btn" onclick="submitDailyAnswer()">Send ✨</button>
+            </div>
+        </div>
+
+        <div id="daily-archive-view" style="display: none;">
+            <div style="display: flex; gap: 6px; margin-bottom: 10px; align-items: center;">
+                <input type="text" id="archive-search-input" placeholder="🔍 Search past questions or answers..." onkeyup="renderDailyArchiveList()" style="margin: 0; padding: 8px 11px; font-size: 12px; flex: 1;">
+                <button class="reset-btn" id="btn-archive-star-filter" onclick="toggleArchiveStarFilter()" style="padding: 8px 11px;">⭐ Starred</button>
+            </div>
+            <div id="daily-archive-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <!-- DRAWER 2: VISIT PREP CHECKLIST (BRING / GET / HAVE READY) -->
+    <div id="hub-drawer-prep" class="card ldr-drawer" style="display: none;">
+        <div class="ldr-drawer-header">
+            <span class="ldr-drawer-tag">📋 NEXT VISIT PREP LIST</span>
+            <button class="ldr-close-btn" onclick="toggleHubDrawer('prep')">✖</button>
+        </div>
+
+        <div class="chip-row" style="margin-bottom: 10px;">
+            <button class="chip active" id="prep-filter-all" onclick="setPrepFilter('all')">All</button>
+            <button class="chip" id="prep-filter-bring" onclick="setPrepFilter('bring')">🧳 To Bring</button>
+            <button class="chip" id="prep-filter-get" onclick="setPrepFilter('get')">🛒 To Get/Buy</button>
+            <button class="chip" id="prep-filter-ready" onclick="setPrepFilter('ready')">🏠 Have Ready</button>
+        </div>
+
+        <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+            <select id="prep-cat-select" style="margin: 0; width: auto; padding: 8px 10px; font-size: 12px;">
+                <option value="bring">🧳 Bring</option>
+                <option value="get">🛒 Get/Buy</option>
+                <option value="ready">🏠 Have Ready</option>
+            </select>
+            <input type="text" id="prep-item-input" placeholder="Add item (e.g. Pastéis de nata, wash sheets)..." style="margin: 0; padding: 8px 11px; font-size: 12.5px; flex: 1;" onkeydown="if(event.key==='Enter') addChecklistItem()">
+            <button class="reset-btn" onclick="addChecklistItem()" style="border-color: var(--accent); color: var(--accent); font-weight: 700;">➕</button>
+        </div>
+
+        <ul id="prep-checklist-ul" class="idea-list" style="max-height: 240px; overflow-y: auto;"></ul>
+    </div>
+
+    <!-- DRAWER 3: COUNTDOWN, FLIGHT NUMBER, TIMEZONE & GPS SETTINGS -->
+    <div id="hub-drawer-settings" class="card ldr-drawer" style="display: none;">
+        <div class="ldr-drawer-header">
+            <span class="ldr-drawer-tag">⚙️ VISIT COUNTDOWN, FLIGHT & CITIES</span>
+            <button class="ldr-close-btn" onclick="toggleHubDrawer('settings')">✖</button>
+        </div>
+
+        <div class="filters-grid">
+            <div>
+                <span class="filter-label">Event / Visit Label</span>
+                <input type="text" id="set-cd-title" placeholder="e.g. João in the USA">
+            </div>
+            <div>
+                <span class="filter-label">Arrival Timezone</span>
+                <select id="set-cd-tz">
+                    <option value="jenna">🇺🇸 Jenna's City Time</option>
+                    <option value="joao">🇵🇹 João's City Time</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="filters-grid">
+            <div>
+                <span class="filter-label">Arrival Date & Exact Time</span>
+                <input type="datetime-local" id="set-cd-date">
+            </div>
+            <div>
+                <span class="filter-label">✈️ Flight # (Optional)</span>
+                <input type="text" id="set-cd-flight" placeholder="e.g. TP201, UA144">
+            </div>
+        </div>
+
+        <div class="filters-grid">
+            <div>
+                <span class="filter-label">João's City</span>
+                <input type="text" id="set-city-joao" placeholder="e.g. Lisbon">
+            </div>
+            <div>
+                <span class="filter-label">Jenna's City</span>
+                <input type="text" id="set-city-jenna" placeholder="e.g. Fairfax">
+            </div>
+        </div>
+
+        <div class="gps-sync-bar">
+            <label class="gps-toggle-label">
+                <input type="checkbox" id="auto-loc-toggle" onchange="toggleAutoLocationSync()">
+                <span class="switch-pill"></span>
+                <span>📍 Auto-GPS</span>
+            </label>
+            <button class="gps-detect-btn" onclick="syncMyCityFromLocation(false)" id="btn-detect-loc">
+                🧭 Locate Me
+            </button>
+        </div>
+
+        <button class="cta-btn" onclick="saveHubSettings()" style="margin-top: 10px; padding: 11px; font-size: 13.5px;">💾 Save Countdown & Cities</button>
+    </div>
+</div>

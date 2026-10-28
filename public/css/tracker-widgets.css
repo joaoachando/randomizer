@@ -1,0 +1,256 @@
+/* DOCTOR QUICK-STATS, ANOMALIES & PATTERN DETECTOR */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+.stat-box {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.stat-val {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+}
+.pattern-item {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.pattern-item.heads-up {
+    border-color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+}
+.pattern-item.anomaly-alert {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.09);
+}
+.pattern-item.healthy-ok {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.08);
+}
+
+/* COLLAPSIBLE HISTORY LOGS ACCORDION */
+.history-logs-drawer {
+    margin-top: 6px;
+    border-top: 1px dashed var(--border);
+    padding-top: 6px;
+}
+.history-logs-drawer summary {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+}
+.history-logs-drawer summary::-webkit-details-marker { display: none; }
+.history-logs-drawer .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+/* VISUAL CYCLE LENGTH BAR CHART */
+.cycle-trend-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.trend-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+}
+.trend-label {
+    width: 52px;
+    font-weight: 600;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+.trend-bar-track {
+    flex: 1;
+    height: 10px;
+    background: var(--bg-base);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.trend-bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    background: var(--accent);
+    transition: width 0.35s ease;
+}
+.trend-bar-fill.atypical {
+    background: #f59e0b;
+}
+.trend-val {
+    width: 38px;
+    text-align: right;
+    font-weight: 700;
+    font-size: 11.5px;
+    flex-shrink: 0;
+}
+
+/* UPGRADED BREATHING PACER ANIMATION */
+.breathing-stage {
+    height: 185px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+.breathing-aura {
+    position: absolute;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.15;
+    filter: blur(8px);
+    transform: scale(1);
+    transition: transform 4s ease-in-out, opacity 1s ease;
+}
+.breathing-circle {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, var(--accent), var(--bg-base) 140%);
+    border: 2px solid var(--accent);
+    color: var(--bg-base);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+    z-index: 2;
+    transform: scale(1);
+    transition: transform 4s ease-in-out;
+}
+.breathing-circle.inhale, .breathing-aura.inhale {
+    transform: scale(1.75);
+    transition: transform 4s ease-in-out;
+}
+.breathing-aura.inhale { opacity: 0.35; }
+.breathing-circle.hold, .breathing-aura.hold {
+    transform: scale(1.75);
+    transition: transform 0.3s linear;
+}
+.breathing-aura.hold { opacity: 0.45; }
+.breathing-circle.exhale, .breathing-aura.exhale {
+    transform: scale(1);
+    transition: transform 6s ease-in-out;
+}
+.breathing-aura.exhale { opacity: 0.12; }
+
+/* UPGRADED PATTERN ENGINE: SUB-PILLS, 7-DAY RADAR & CONFIDENCE BARS */
+.pattern-nav-pills {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+.pattern-nav-btn {
+    flex: 1;
+    padding: 7px 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-base);
+    color: var(--text-main);
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: 0.15s;
+}
+.pattern-nav-btn.active {
+    background: var(--accent);
+    color: var(--bg-base);
+    border-color: var(--accent);
+    opacity: 1;
+}
+
+.radar-strip-wrap {
+    margin-bottom: 12px;
+}
+.radar-strip {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    text-align: center;
+}
+.radar-day-box {
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 6px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+.radar-day-box.has-pred {
+    border-color: rgba(245, 158, 11, 0.55);
+    background: rgba(245, 158, 11, 0.07);
+}
+.radar-day-lbl {
+    font-size: 9.5px;
+    font-weight: 700;
+    opacity: 0.75;
+}
+.radar-cday {
+    font-size: 9px;
+    opacity: 0.5;
+}
+.radar-icons {
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    font-size: 12px;
+}
+
+.pattern-tip-box {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 2.5px solid #fbbf24;
+    font-size: 11.5px;
+    line-height: 1.35;
+}
+
+.conf-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+}
+.conf-bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-card);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.conf-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+}
+.conf-bar-lbl {
+    font-size: 10.5px;
+    font-weight: 700;
+    opacity: 0.75;
+    white-space: nowrap;
+}
