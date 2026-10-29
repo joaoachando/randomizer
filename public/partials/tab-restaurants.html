@@ -119,10 +119,10 @@
     </div>
 
     <!-- MASTER RESTAURANT LIST & INTERACTIVE DARK-MODE PIN MAP -->
-    <div class="card">
-        <div style="display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
-            <input type="text" id="search-food" placeholder="🔍 Search spots, neighborhoods, dishes..." onkeyup="renderRestaurantList()" style="margin: 0; flex: 1; min-width: 150px;">
-            <select id="filter-food-status" onchange="renderRestaurantList()" style="margin: 0; width: auto; padding: 10px;">
+    <div class="card list-card">
+        <div class="food-list-toolbar">
+            <input type="text" id="search-food" placeholder="🔍 Search spots, neighborhoods, dishes..." onkeyup="renderRestaurantList()">
+            <select id="filter-food-status" onchange="renderRestaurantList()">
                 <option value="all">All Spots</option>
                 <option value="todo">📍 To Try</option>
                 <option value="visited">✅ Visited</option>
