@@ -4,29 +4,33 @@
         <div class="p3-brand">
             <span class="p3-logo" onclick="switchTab('play')">P³</span>
             <span class="p3-couple-tag" onclick="openSecretTracker()" title="Secret Tracker">for Jenna & João 🤍</span>
-            <span id="jenna-active-pill" class="jenna-active-badge" style="display: none;" title="Jenna's last activity"></span>
         </div>
 
-        <div class="p3-actions">
-            <span id="welcome-text" class="p3-icon-pill" onclick="logout()" title="Switch user" style="display: none;"></span>
+        <div>
+            <div class="p3-actions">
+                <span id="welcome-text" class="p3-icon-pill" onclick="logout()" title="Switch user" style="display: none;"></span>
 
-            <button class="p3-icon-btn" onclick="togglePushNotifications()" id="btn-push-perm" title="Toggle Notifications">
-                <span id="push-dot" class="status-dot off"></span>
-                <span id="push-label">🔔</span>
-            </button>
+                <button class="p3-icon-btn" onclick="togglePushNotifications()" id="btn-push-perm" title="Toggle Notifications">
+                    <span id="push-dot" class="status-dot off"></span>
+                    <span id="push-label">🔔</span>
+                </button>
 
-            <div class="theme-picker" id="themePicker">
-                <button class="p3-icon-btn" onclick="toggleThemePicker(event)" title="Change Theme">🎨</button>
-                <div class="theme-picker-menu">
-                    <div class="theme-category">Dark Modes</div>
-                    <div class="theme-option" data-theme="catppuccin" onclick="setTheme('catppuccin')">☕ Catppuccin</div>
-                    <div class="theme-option" data-theme="nord" onclick="setTheme('nord')">❄️ Nord</div>
-                    <div class="theme-option" data-theme="dracula" onclick="setTheme('dracula')">🧛 Dracula</div>
-                    <div class="theme-option" data-theme="tokyonight" onclick="setTheme('tokyonight')">🏙️ Tokyo Night</div>
-                    <div class="theme-category">Light Modes</div>
-                    <div class="theme-option" data-theme="latte" onclick="setTheme('latte')">🥛 Latte</div>
-                    <div class="theme-option" data-theme="solarized" onclick="setTheme('solarized')">☀️ Solarized</div>
+                <div class="theme-picker" id="themePicker">
+                    <button class="p3-icon-btn" onclick="toggleThemePicker(event)" title="Change Theme">🎨</button>
+                    <div class="theme-picker-menu">
+                        <div class="theme-category">Dark Modes</div>
+                        <div class="theme-option" data-theme="catppuccin" onclick="setTheme('catppuccin')">☕ Catppuccin</div>
+                        <div class="theme-option" data-theme="nord" onclick="setTheme('nord')">❄️ Nord</div>
+                        <div class="theme-option" data-theme="dracula" onclick="setTheme('dracula')">🧛 Dracula</div>
+                        <div class="theme-option" data-theme="tokyonight" onclick="setTheme('tokyonight')">🏙️ Tokyo Night</div>
+                        <div class="theme-category">Light Modes</div>
+                        <div class="theme-option" data-theme="latte" onclick="setTheme('latte')">🥛 Latte</div>
+                        <div class="theme-option" data-theme="solarized" onclick="setTheme('solarized')">☀️ Solarized</div>
+                    </div>
                 </div>
+            </div>
+            <div>
+                <span id="jenna-active-pill" class="jenna-active-badge" style="display: none;" title="Jenna's last activity"></span>
             </div>
         </div>
     </header>

@@ -67,15 +67,28 @@ async function autoFillFromMapsLink() {
         }
         if (data.city && !cityInput.value) cityInput.value = data.city;
         if (data.neighborhood && neighInput && !neighInput.value) neighInput.value = data.neighborhood;
-        if (data.lat && data.lng) {
-            pendingSpotLat = data.lat;
-            pendingSpotLng = data.lng;
+        const latitude = data.lat === null || data.lat === '' ? NaN : Number(data.lat);
+        const longitude = data.lng === null || data.lng === '' ? NaN : Number(data.lng);
+        const hasExactPin = Number.isFinite(latitude) && Number.isFinite(longitude) &&
+            Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+        if (hasExactPin) {
+            pendingSpotLat = latitude;
+            pendingSpotLng = longitude;
+        } else {
+            pendingSpotLat = null;
+            pendingSpotLng = null;
+            showToast('Could not read the exact pin from that link. This spot will not be plotted until exact coordinates are available.', true);
         }
-        if (data.name || data.city) {
+        if ((data.name || data.city) && hasExactPin) {
             triggerHaptic(12);
             showToast(`📍 Auto-filled: ${data.name || 'Spot'} ${data.neighborhood ? `• ${data.neighborhood}` : ''}`);
+        } else if (data.name || data.city) {
+            triggerHaptic(12);
+            showToast(`📍 Auto-filled: ${data.name || 'Spot'} • Exact map pin unavailable`, true);
         }
-    } catch (e) {}
+    } catch (e) {
+        showToast(e.message || 'Could not read the Google Maps location.', true);
+    }
 }
 
 async function autoFetchSocialThumb() {
@@ -258,13 +271,16 @@ async function saveRestaurant() {
         lng: pendingSpotLng
     };
 
+    let response;
     if (editingRestaurantId) {
-        await apiFetch(`/api/restaurants/${editingRestaurantId}`, { method: 'PATCH', body: JSON.stringify(payload) });
-        showToast("Spot updated! ✨");
+        response = await apiFetch(`/api/restaurants/${editingRestaurantId}`, { method: 'PATCH', body: JSON.stringify(payload) });
     } else {
-        await apiFetch('/api/restaurants', { method: 'POST', body: JSON.stringify(payload) });
-        showToast(`Saved "${name}" in ${city}! 🍽️`);
+        response = await apiFetch('/api/restaurants', { method: 'POST', body: JSON.stringify(payload) });
     }
+    const result = await response.json();
+    if (!response.ok) return showToast(result.error || 'Could not save this spot.', true);
+    if (result.locationResolved) showToast(editingRestaurantId ? 'Spot updated! ✨' : `Saved "${name}" in ${city}! 🍽️`);
+    else showToast(`Saved "${name}", but couldn't find its exact map location from the name and city. Add a Google Maps link for a pin.`, true);
 
     editingRestaurantId = null;
     pendingSpotLat = null;
@@ -387,6 +403,7 @@ function renderFoodMap(filteredSpots) {
 
     const bounds = [];
     list.forEach(r => {
+        if (r.mapCoordinateSource !== 'google-place-pin' && r.mapCoordinateSource !== 'stored') return;
         if (r.lat === null || r.lat === undefined || r.lat === '' || r.lng === null || r.lng === undefined || r.lng === '') return;
         const lat = Number(r.lat);
         const lng = Number(r.lng);

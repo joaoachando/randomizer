@@ -311,12 +311,17 @@ module.exports = function(requireAuth) {
         const { url } = req.body;
         if (!url || !url.startsWith('http')) return res.status(400).json({ error: 'Invalid URL' });
         try {
-            const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; P3Bot/1.0)' } });
+            const response = await fetch(url, {
+                redirect: 'follow',
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; P3Bot/1.0)' }
+            });
+            if (!response.ok) throw new Error(`Google Maps returned HTTP ${response.status}`);
             const finalUrl = response.url || url;
             const html = await response.text();
             let name = '', city = '', neighborhood = '', lat = null, lng = null;
 
-            const coordMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+            const coordMatch = finalUrl.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/) ||
+                html.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
             if (coordMatch) {
                 lat = parseFloat(coordMatch[1]);
                 lng = parseFloat(coordMatch[2]);
@@ -349,9 +354,19 @@ module.exports = function(requireAuth) {
             if (!neighborhood && Number.isFinite(lat) && Number.isFinite(lng)) {
                 neighborhood = await findNeighborhood(lat, lng);
             }
+            console.log('[P3 restaurant-map] Maps autofill:', JSON.stringify({
+                sourceHost: new URL(url).hostname,
+                resolvedHost: new URL(finalUrl).hostname,
+                name,
+                city,
+                lat,
+                lng,
+                coordinateSource: coordMatch ? 'google-place-pin' : 'no-place-pin'
+            }));
             res.json({ name, city, neighborhood, lat, lng, finalUrl });
         } catch (e) {
-            res.json({ name: '', city: '', neighborhood: '', lat: null, lng: null, finalUrl: url });
+            console.error('[P3 restaurant-map] Maps autofill failed:', e.message);
+            res.status(502).json({ error: 'Could not read this Google Maps link.' });
         }
     });
 

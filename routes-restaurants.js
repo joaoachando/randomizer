@@ -1,31 +1,150 @@
 const express = require('express');
 const router = express.Router();
 const db = require('./db');
+let geocodeQueue = Promise.resolve();
+let lastGeocodeRequestAt = 0;
 
-async function geocodeSpotFallback(name, city) {
+function validCoordinates(lat, lng) {
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+}
+
+function parseCoordinate(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const coordinate = Number(value);
+    return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+function mapLinkCoordinates(url) {
+    if (!url) return null;
+    const marker = url.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+    if (!marker) return null;
+    const lat = Number(marker[1]);
+    const lng = Number(marker[2]);
+    return validCoordinates(lat, lng) ? { lat, lng } : null;
+}
+
+function normalizePlaceName(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function queueGeocodeRequest(url) {
+    const request = geocodeQueue.then(async () => {
+        const delay = Math.max(0, 1000 - (Date.now() - lastGeocodeRequestAt));
+        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+        lastGeocodeRequestAt = Date.now();
+        const response = await fetch(url, {
+            headers: { 'User-Agent': 'P3-Randomizer/1.0 (restaurant location lookup)' },
+            signal: AbortSignal.timeout(8000)
+        });
+        if (!response.ok) throw new Error(`Location lookup returned HTTP ${response.status}.`);
+        return response.json();
+    });
+    geocodeQueue = request.catch(() => {});
+    return request;
+}
+
+async function geocodeRestaurant(name, city) {
+    const endpoint = new URL('https://nominatim.openstreetmap.org/search');
+    endpoint.searchParams.set('format', 'jsonv2');
+    endpoint.searchParams.set('addressdetails', '1');
+    endpoint.searchParams.set('namedetails', '1');
+    endpoint.searchParams.set('limit', '5');
+    endpoint.searchParams.set('q', `${name}, ${city}`);
+
     try {
-        const q = `${name} ${city}`.trim();
-        const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
-        const d = await r.json();
-        if (d.results && d.results[0]) {
-            const jitter = () => (Math.random() - 0.5) * 0.012;
-            return { lat: d.results[0].latitude + jitter(), lng: d.results[0].longitude + jitter() };
+        const results = await queueGeocodeRequest(endpoint);
+        const target = normalizePlaceName(name);
+        const match = results.find(result => {
+            const names = [result.name, result.namedetails?.name, result.display_name?.split(',')[0]]
+                .map(normalizePlaceName)
+                .filter(Boolean);
+            return names.some(candidate =>
+                candidate === target ||
+                (candidate.length >= 5 && target.includes(candidate)) ||
+                (target.length >= 5 && candidate.includes(target))
+            );
+        });
+        if (!match) {
+            console.info(`[P3 restaurant-map] No exact name match from geocoder for ${JSON.stringify(name)}, ${JSON.stringify(city)}.`);
+            return null;
         }
-    } catch (e) {}
-    return { lat: null, lng: null };
+        const lat = Number(match.lat);
+        const lng = Number(match.lon);
+        if (!validCoordinates(lat, lng)) return null;
+        return { lat, lng };
+    } catch (error) {
+        console.warn(`[P3 restaurant-map] Name/city geocoding failed for ${JSON.stringify(name)}, ${JSON.stringify(city)}: ${error.message}`);
+        return null;
+    }
+}
+
+function isGoogleMapsLink(value) {
+    try {
+        const url = new URL(value);
+        return url.protocol === 'https:' &&
+            (url.hostname === 'maps.app.goo.gl' || url.hostname === 'goo.gl' ||
+                url.hostname === 'maps.google.com' || url.hostname.endsWith('.google.com'));
+    } catch (e) {
+        return false;
+    }
+}
+
+async function resolveMapLinkCoordinates(value) {
+    const direct = mapLinkCoordinates(value);
+    if (direct || !isGoogleMapsLink(value)) return direct;
+    try {
+        const response = await fetch(value, {
+            redirect: 'follow',
+            signal: AbortSignal.timeout(8000),
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; P3-Randomizer/1.0)' }
+        });
+        if (!response.ok) return null;
+        return mapLinkCoordinates(response.url);
+    } catch (e) {
+        return null;
+    }
+}
+
+async function backfillRestaurantCoordinates(rows) {
+    for (const row of rows) {
+        const mapCoords = await resolveMapLinkCoordinates(row.mapsLink);
+        const source = mapCoords ? 'google-place-pin' :
+            (parseCoordinate(row.lat) !== null && parseCoordinate(row.lng) !== null ? 'stored' : 'missing');
+        if (mapCoords && (mapCoords.lat !== Number(row.lat) || mapCoords.lng !== Number(row.lng))) {
+            row.lat = mapCoords.lat;
+            row.lng = mapCoords.lng;
+            await new Promise((resolve, reject) => {
+                db.run('UPDATE restaurants SET lat = ?, lng = ? WHERE id = ?', [row.lat, row.lng, row.id], err => {
+                    if (err) return reject(err);
+                    resolve();
+                });
+            });
+        }
+        row.mapCoordinateSource = source;
+        let mapsHost = '';
+        try { mapsHost = new URL(row.mapsLink).hostname; } catch (e) {}
+        console.log(`[P3 restaurant-map] id=${row.id} name=${JSON.stringify(row.name)} city=${JSON.stringify(row.city)} lat=${row.lat ?? 'null'} lng=${row.lng ?? 'null'} mapsHost=${mapsHost || 'none'} source=${source} pinned=${Boolean(mapCoords)}`);
+    }
 }
 
 module.exports = function(requireAuth, notifyPartner) {
     router.get('/restaurants', requireAuth, (req, res) => {
         db.all('SELECT * FROM restaurants ORDER BY id DESC', [], (err, rows) => {
             if (err) return res.status(500).json({ error: err.message });
-            db.all('SELECT tag FROM custom_cuisines ORDER BY rowid ASC', [], (err2, tags) => {
-                if (err2) return res.status(500).json({ error: err2.message });
-                res.json({
-                    restaurants: rows || [],
-                    customCuisines: (tags || []).map(t => t.tag)
+            backfillRestaurantCoordinates(rows || []).then(() => {
+                db.all('SELECT tag FROM custom_cuisines ORDER BY rowid ASC', [], (err2, tags) => {
+                    if (err2) return res.status(500).json({ error: err2.message });
+                    res.json({
+                        restaurants: rows || [],
+                        customCuisines: (tags || []).map(t => t.tag)
+                    });
                 });
-            });
+            }).catch(backfillErr => res.status(500).json({ error: backfillErr.message }));
         });
     });
 
@@ -33,13 +152,11 @@ module.exports = function(requireAuth, notifyPartner) {
         const { name, city, neighborhood, cuisine, vibe, price, socialLink, mapsLink, mustOrder, spotType, tripFolder, thumbnailUrl, lat, lng } = req.body;
         if (!name || !city) return res.status(400).json({ error: 'Name and city are required.' });
 
-        let finalLat = lat || null;
-        let finalLng = lng || null;
-        if (!finalLat || !finalLng) {
-            const geo = await geocodeSpotFallback(name, city);
-            finalLat = geo.lat;
-            finalLng = geo.lng;
-        }
+        const exactCoords = await resolveMapLinkCoordinates(mapsLink) ||
+            await geocodeRestaurant(name.trim(), city.trim()) ||
+            (validCoordinates(parseCoordinate(lat), parseCoordinate(lng)) ? { lat: Number(lat), lng: Number(lng) } : null);
+        let finalLat = exactCoords?.lat ?? null;
+        let finalLng = exactCoords?.lng ?? null;
 
         db.run(
             `INSERT INTO restaurants (name, city, neighborhood, cuisine, vibe, price, socialLink, mapsLink, mustOrder, addedBy, spotType, tripFolder, thumbnailUrl, lat, lng)
@@ -50,27 +167,27 @@ module.exports = function(requireAuth, notifyPartner) {
                 if (notifyPartner) {
                     notifyPartner(req.user, `🍽️ New Spot in ${city.trim()}!`, `${req.user} added "${name.trim()}" (${cuisine || 'Food'})`);
                 }
-                res.json({ id: this.lastID });
+                res.json({ id: this.lastID, locationResolved: validCoordinates(finalLat, finalLng) });
             }
         );
     });
 
     router.patch('/restaurants/:id', requireAuth, async (req, res) => {
         const { name, city, neighborhood, cuisine, vibe, price, socialLink, mapsLink, mustOrder, spotType, tripFolder, thumbnailUrl, lat, lng } = req.body;
-        let finalLat = lat || null;
-        let finalLng = lng || null;
-        if (!finalLat || !finalLng) {
-            const geo = await geocodeSpotFallback(name, city);
-            finalLat = geo.lat;
-            finalLng = geo.lng;
-        }
+        const exactCoords = await resolveMapLinkCoordinates(mapsLink) ||
+            await geocodeRestaurant(name.trim(), city.trim()) ||
+            (validCoordinates(parseCoordinate(lat), parseCoordinate(lng))
+                ? { lat: Number(lat), lng: Number(lng) }
+                : null);
+        let finalLat = exactCoords?.lat ?? null;
+        let finalLng = exactCoords?.lng ?? null;
 
         db.run(
             `UPDATE restaurants SET name=?, city=?, neighborhood=?, cuisine=?, vibe=?, price=?, socialLink=?, mapsLink=?, mustOrder=?, spotType=?, tripFolder=?, thumbnailUrl=?, lat=?, lng=? WHERE id=?`,
             [name.trim(), city.trim(), (neighborhood || '').trim(), cuisine, vibe, price, socialLink || '', mapsLink || '', mustOrder || '', spotType || 'dining', (tripFolder || '').trim(), thumbnailUrl || '', finalLat, finalLng, req.params.id],
             (err) => {
                 if (err) return res.status(500).json({ error: err.message });
-                res.json({ success: true });
+                res.json({ success: true, locationResolved: validCoordinates(finalLat, finalLng) });
             }
         );
     });

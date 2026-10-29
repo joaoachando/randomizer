@@ -95,6 +95,7 @@ async function initLdrHub() {
     if (!hubPollTimerId) hubPollTimerId = setInterval(fetchHubData, 25000);
     setInterval(refreshWeatherAndClocks, 600000);
     setInterval(renderWeatherTzPill, 15000);
+    setInterval(renderJennaLastActive, 15000);
 }
 
 async function fetchHubData() {
