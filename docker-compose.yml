@@ -6,6 +6,13 @@ services:
       - "3000:3000"
     volumes:
       - ./data:/usr/src/app/data
+    environment:
+      FLIGHTAWARE_API_KEY: ${FLIGHTAWARE_API_KEY:-}
+      META_OEMBED_ACCESS_TOKEN: ${META_OEMBED_ACCESS_TOKEN:-}
+      META_APP_ID: ${META_APP_ID:-}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v22.0}
+      WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-https://randomizer.achando.dev}
     restart: unless-stopped
 
   # Add this new service

@@ -1,6 +1,7 @@
 let activeIdeaTripFilter = 'all';
 let lastWinnerIdea = null;
 let hasLoadedIdeas = false;
+let listSortBeforeTimeline = 'newest';
 
 async function pickRandom() {
     requestDeviceMotionAccess();
@@ -209,49 +210,72 @@ function renderList() {
     renderMasterQuickFilters();
 
     const ul = document.getElementById('idea-ul');
+    if (!ul) return;
     ul.innerHTML = '';
 
     const searchTerm = (document.getElementById('search-ideas')?.value || '').toLowerCase();
-    const sortMethod = document.getElementById('sort-ideas')?.value || 'newest';
+    const sortSelect = document.getElementById('sort-ideas');
+    const sortMethod = sortSelect?.value || 'newest';
+    const timelineButton = document.getElementById('btn-scrapbook-timeline');
+    if (timelineButton) {
+        const isTimeline = sortMethod === 'memories';
+        timelineButton.setAttribute('aria-pressed', String(isTimeline));
+        timelineButton.classList.toggle('active', isTimeline);
+    }
 
     // CHRONOLOGICAL SCRAPBOOK TIMELINE (INTERLEAVES COMPLETED DATES & VISITED RESTAURANTS)
     if (sortMethod === 'memories') {
         const doneDates = ideas.filter(i => i.isDone).map(i => ({
             kind: 'date', id: i.id, title: i.isSecret ? '👀 Secret Date' : i.title,
-            dateStr: i.completedDate || '2026-01-01', note: i.memory || '',
+            dateStr: i.completedDate || '', note: i.memory || '',
             joaoR: i.joaoRating || i.rating || 5, jennaR: i.jennaRating || i.rating || 5,
             photo: i.photoData || '', sub: `🎲 Date • ${i.vibe || ''}`
         }));
         const doneSpots = (typeof restaurants !== 'undefined' ? restaurants : []).filter(r => r.isVisited).map(r => ({
             kind: 'spot', id: r.id, title: `${r.name} (${r.city})`,
-            dateStr: r.visitedDate || '2026-01-01', note: r.review || '',
+            dateStr: r.visitedDate || '', note: r.review || '',
             joaoR: r.joaoRating || r.rating || 5, jennaR: r.jennaRating || r.rating || 5,
             photo: r.photoData || '', sub: `🍽️ ${r.cuisine || 'Spot'} • ${r.price || ''}`
         }));
 
         const timeline = [...doneDates, ...doneSpots]
-            .filter(m => m.title.toLowerCase().includes(searchTerm) || m.note.toLowerCase().includes(searchTerm))
-            .sort((a, b) => b.dateStr.localeCompare(a.dateStr));
+            .filter(m => m.title.toLowerCase().includes(searchTerm) ||
+                m.note.toLowerCase().includes(searchTerm) ||
+                m.sub.toLowerCase().includes(searchTerm) ||
+                m.dateStr.includes(searchTerm))
+            .sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
 
         if (timeline.length === 0) {
             ul.innerHTML = `<li class="idea-item" style="text-align:center;opacity:0.7;">No completed memories yet! Mark a date or restaurant as ✅ Done to build your Scrapbook.</li>`;
             return;
         }
 
-        ul.innerHTML = timeline.map(m => `
-            <li class="idea-item" style="border-left: 3.5px solid var(--accent);">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span class="badge user-badge">📅 ${m.dateStr}</span>
-                    <span class="badge">João: ${m.joaoR}❤️ • Jenna: ${m.jennaR}❤️</span>
-                </div>
-                <div style="font-weight:800;font-size:15px;margin-top:4px;">${m.title}</div>
-                <div style="font-size:11.5px;opacity:0.7;">${m.sub}</div>
-                ${m.note ? `<div class="memory-quote">“${linkify(m.note)}”</div>` : ''}
-                ${m.photo ? `<img src="${m.photo}" class="memory-photo-img" alt="Scrapbook memory" loading="lazy">` : ''}
-            </li>
-        `).join('');
+        ul.classList.add('scrapbook-list');
+        let currentMonth = null;
+        ul.innerHTML = timeline.map(m => {
+            const monthKey = m.dateStr ? m.dateStr.slice(0, 7) : 'undated';
+            const monthTitle = m.dateStr
+                ? new Date(`${monthKey}-01T00:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+                : 'Date not recorded';
+            const monthHeading = monthKey !== currentMonth
+                ? `<li class="scrapbook-month-heading">${monthTitle}</li>`
+                : '';
+            currentMonth = monthKey;
+            return `${monthHeading}
+                <li class="idea-item scrapbook-event">
+                    <div class="scrapbook-event-meta">
+                        <span class="badge user-badge">📅 ${m.dateStr || 'Date not recorded'}</span>
+                        <span class="badge">João: ${m.joaoR}❤️ • Jenna: ${m.jennaR}❤️</span>
+                    </div>
+                    <div style="font-weight:800;font-size:15px;">${m.title}</div>
+                    <div style="font-size:11.5px;opacity:0.7;">${m.sub}</div>
+                    ${m.note ? `<div class="memory-quote">“${linkify(m.note)}”</div>` : ''}
+                    ${m.photo ? `<img src="${m.photo}" class="memory-photo-img" alt="Scrapbook memory" loading="lazy">` : ''}
+                </li>`;
+        }).join('');
         return;
     }
+    ul.classList.remove('scrapbook-list');
 
     let filteredIdeas = ideas.filter(i => {
         if (masterQuickFilter === 'todo' && i.isDone) return false;
@@ -320,4 +344,16 @@ function renderList() {
         `;
         ul.appendChild(li);
     });
+}
+
+function toggleScrapbookTimeline() {
+    const sortSelect = document.getElementById('sort-ideas');
+    if (!sortSelect) return;
+    if (sortSelect.value === 'memories') {
+        sortSelect.value = listSortBeforeTimeline;
+    } else {
+        listSortBeforeTimeline = sortSelect.value;
+        sortSelect.value = 'memories';
+    }
+    renderList();
 }

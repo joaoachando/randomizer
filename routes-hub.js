@@ -4,6 +4,9 @@ const db = require('./db');
 
 let webpush = null;
 try { webpush = require('web-push'); } catch (e) {}
+const neighborhoodCache = new Map();
+let lastNeighborhoodLookupAt = 0;
+let neighborhoodLookupQueue = Promise.resolve();
 
 // Initialize VAPID keys automatically if web-push npm package is installed
 let vapidPublicKey = '';
@@ -90,6 +93,22 @@ async function fetchSocialThumbnail(url) {
                 if (oData.thumbnail_url) return oData.thumbnail_url;
             }
         }
+        if (url.includes('instagram.com')) {
+            const accessToken = process.env.META_OEMBED_ACCESS_TOKEN ||
+                (process.env.META_APP_ID && process.env.META_APP_SECRET
+                    ? `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
+                    : '');
+            if (accessToken) {
+                const endpoint = new URL(`https://graph.facebook.com/${process.env.META_GRAPH_API_VERSION || 'v22.0'}/instagram_oembed`);
+                endpoint.searchParams.set('url', url);
+                endpoint.searchParams.set('access_token', accessToken);
+                const oRes = await fetch(endpoint);
+                if (oRes.ok) {
+                    const oData = await oRes.json();
+                    if (oData.thumbnail_url) return oData.thumbnail_url;
+                }
+            }
+        }
         const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; P3Bot/1.0)' } });
         const html = await res.text();
         const ogImg = html.match(/property="og:image"\s+content="([^"]+)"/i) || html.match(/content="([^"]+)"\s+property="og:image"/i);
@@ -97,6 +116,43 @@ async function fetchSocialThumbnail(url) {
     } catch (e) {
         return '';
     }
+}
+
+async function findNeighborhood(lat, lng) {
+    const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+    if (neighborhoodCache.has(cacheKey)) return neighborhoodCache.get(cacheKey);
+
+    const lookup = neighborhoodLookupQueue.then(async () => {
+        const cached = neighborhoodCache.get(cacheKey);
+        if (cached) return cached;
+        const waitMs = Math.max(0, 1000 - (Date.now() - lastNeighborhoodLookupAt));
+        if (waitMs) await new Promise(resolve => setTimeout(resolve, waitMs));
+        lastNeighborhoodLookupAt = Date.now();
+
+        try {
+            const endpoint = new URL('https://nominatim.openstreetmap.org/reverse');
+            endpoint.searchParams.set('format', 'jsonv2');
+            endpoint.searchParams.set('addressdetails', '1');
+            endpoint.searchParams.set('zoom', '16');
+            endpoint.searchParams.set('lat', String(lat));
+            endpoint.searchParams.set('lon', String(lng));
+            const response = await fetch(endpoint, { headers: { 'User-Agent': 'P3CouplesPlanner/1.0' } });
+            if (!response.ok) return '';
+            const data = await response.json();
+            const address = data.address || {};
+            const neighborhood = address.neighbourhood || address.suburb ||
+                address.city_district || address.quarter || address.borough || '';
+            if (neighborhood) {
+                if (neighborhoodCache.size >= 200) neighborhoodCache.delete(neighborhoodCache.keys().next().value);
+                neighborhoodCache.set(cacheKey, neighborhood);
+            }
+            return neighborhood;
+        } catch (e) {
+            return '';
+        }
+    });
+    neighborhoodLookupQueue = lookup.then(() => undefined, () => undefined);
+    return lookup;
 }
 
 module.exports = function(requireAuth) {
@@ -280,13 +336,18 @@ module.exports = function(requireAuth) {
 
             const ogMatch = html.match(/property="og:title"\s+content="([^"]+)"/i) || html.match(/<title>([^<]+)<\/title>/i);
             if (ogMatch && ogMatch[1]) {
-                const segments = ogMatch[1].replace(/ - Google Maps/i, '').trim().split('·').map(s => s.trim());
+                const segments = ogMatch[1].replace(/ - Google Maps/i, '').trim().split('·')
+                    .map(s => s.trim())
+                    .filter(s => s && !/^google maps$/i.test(s));
                 if (!name && segments[0]) name = segments[0];
                 if (segments[1]) {
                     const addrParts = segments[1].split(',').map(s => s.trim());
                     if (!city) city = addrParts[addrParts.length - 1] || addrParts[0] || '';
                     if (!neighborhood && addrParts.length >= 2) neighborhood = addrParts[0] || '';
                 }
+            }
+            if (!neighborhood && Number.isFinite(lat) && Number.isFinite(lng)) {
+                neighborhood = await findNeighborhood(lat, lng);
             }
             res.json({ name, city, neighborhood, lat, lng, finalUrl });
         } catch (e) {
@@ -297,6 +358,42 @@ module.exports = function(requireAuth) {
     router.post('/social-oembed', requireAuth, async (req, res) => {
         const thumbnailUrl = await fetchSocialThumbnail(req.body.url || '');
         res.json({ thumbnailUrl });
+    });
+
+    router.get('/flight-status/:ident', requireAuth, async (req, res) => {
+        const ident = String(req.params.ident || '').toUpperCase();
+        if (!/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/.test(ident)) {
+            return res.status(400).json({ error: 'Invalid flight number.' });
+        }
+        const apiKey = process.env.FLIGHTAWARE_API_KEY;
+        if (!apiKey) return res.status(503).json({ error: 'Live flight tracking is not configured.' });
+
+        const now = new Date();
+        const start = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
+        const end = new Date(now.getTime() + 36 * 60 * 60 * 1000).toISOString();
+        const endpoint = new URL(`https://aeroapi.flightaware.com/aeroapi/flights/${encodeURIComponent(ident)}`);
+        endpoint.searchParams.set('start', start);
+        endpoint.searchParams.set('end', end);
+        try {
+            const response = await fetch(endpoint, { headers: { 'x-apikey': apiKey } });
+            if (!response.ok) return res.status(502).json({ error: 'Flight tracking provider is unavailable.' });
+            const payload = await response.json();
+            const flight = (payload.flights || []).find(item => item.ident?.toUpperCase() === ident) || payload.flights?.[0];
+            if (!flight) return res.json({ flight: null });
+            res.json({
+                flight: {
+                    ident: flight.ident,
+                    status: flight.status,
+                    scheduled_in: flight.scheduled_in,
+                    estimated_in: flight.estimated_in,
+                    actual_in: flight.actual_in,
+                    arrival_terminal: flight.arrival_terminal,
+                    arrival_gate: flight.arrival_gate
+                }
+            });
+        } catch (e) {
+            res.status(502).json({ error: 'Flight tracking provider is unavailable.' });
+        }
     });
 
     return { router, notifyPartner, fetchSocialThumbnail };

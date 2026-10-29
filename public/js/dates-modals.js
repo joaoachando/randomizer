@@ -87,7 +87,7 @@ function handleMemoryPhotoSelect(event) {
             let dataUrl = '';
             let sizeBytes = 0;
 
-            for (let attempt = 0; attempt < 14; attempt++) {
+            for (let attempt = 0; attempt < 24; attempt++) {
                 const w = Math.max(1, Math.round(img.width * scale));
                 const h = Math.max(1, Math.round(img.height * scale));
                 canvas.width = w;
@@ -100,6 +100,9 @@ function handleMemoryPhotoSelect(event) {
                 if (sizeBytes <= 35 * 1024) break;
                 if (quality > 0.4) quality = Math.max(0.4, quality - 0.1);
                 else scale *= 0.8;
+            }
+            if (sizeBytes > 35 * 1024) {
+                return showToast('This photo could not be compressed below 35 KB. Choose a smaller image.', true);
             }
             pendingMemoryPhoto = dataUrl;
             const prevImg = document.getElementById('memory-photo-preview');

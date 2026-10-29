@@ -1,5 +1,14 @@
 let userName = localStorage.getItem('userName') || '';
 let userPassword = localStorage.getItem('userPassword') || '';
+localStorage.removeItem('sessionToken');
+localStorage.removeItem('p3_bio_vault');
+
+function authHeaders() {
+    return {
+        'x-user-name': userName,
+        'x-user-password': userPassword
+    };
+}
 
 function triggerHaptic(pattern = 10) {
     if (navigator.vibrate) {
@@ -102,8 +111,7 @@ async function apiFetch(url, options = {}) {
     const method = (options.method || 'GET').toUpperCase();
     const headers = {
         'Content-Type': 'application/json',
-        'x-user-name': userName,
-        'x-user-password': userPassword,
+        ...authHeaders(),
         ...(options.headers || {})
     };
 
@@ -152,8 +160,7 @@ async function flushOfflineOutbox() {
                 ...item.options,
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-user-name': userName,
-                    'x-user-password': userPassword
+                    ...authHeaders()
                 }
             });
             if (!res.ok) {
@@ -207,77 +214,137 @@ function toggleGuestLogin() {
 }
 
 // FACEID / TOUCHID WEBAUTHN BIOMETRIC UNLOCK
-function readBiometricVault() {
-    const raw = localStorage.getItem('p3_bio_vault');
-    if (!raw) return null;
-    try {
-        const vault = JSON.parse(raw);
-        return vault && typeof vault === 'object' ? vault : null;
-    } catch (e) {
-        return null;
-    }
-}
-
 function checkBiometricButtonVisibility() {
     const btn = document.getElementById('bio-unlock-btn');
     if (!btn) return;
-    const vault = readBiometricVault();
-    btn.style.display = (vault && vault.credentialId && window.PublicKeyCredential) ? 'block' : 'none';
+    const name = document.getElementById('login-name')?.value || '';
+    const enabled = localStorage.getItem(`p3_bio_enabled_${name}`) === '1';
+    btn.style.display = (enabled && window.PublicKeyCredential) ? 'block' : 'none';
 }
 
-async function registerBiometricIfSupported(name, password) {
+function base64UrlToBuffer(value) {
+    const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+    const binary = atob(padded);
+    return Uint8Array.from(binary, char => char.charCodeAt(0)).buffer;
+}
+
+function bufferToBase64Url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function serializePasskeyCredential(credential) {
+    const response = credential.response;
+    const result = {
+        id: credential.id,
+        rawId: bufferToBase64Url(credential.rawId),
+        type: credential.type,
+        response: {
+            clientDataJSON: bufferToBase64Url(response.clientDataJSON)
+        }
+    };
+    if (response.attestationObject) {
+        result.response.attestationObject = bufferToBase64Url(response.attestationObject);
+        result.response.transports = response.getTransports ? response.getTransports() : [];
+    } else {
+        result.response.authenticatorData = bufferToBase64Url(response.authenticatorData);
+        result.response.signature = bufferToBase64Url(response.signature);
+        result.response.userHandle = response.userHandle ? bufferToBase64Url(response.userHandle) : null;
+    }
+    return result;
+}
+
+async function registerBiometricIfSupported(name) {
     if (!window.PublicKeyCredential || name === 'Guest') return;
-    const existingVault = readBiometricVault();
-    if (existingVault && existingVault.credentialId) return;
+    if (localStorage.getItem(`p3_bio_enabled_${name}`) === '1') return;
     try {
+        const statusResponse = await fetch('/api/webauthn/status', { headers: authHeaders() });
+        if (!statusResponse.ok) return;
+        const status = await statusResponse.json();
+        if (status.registered) {
+            localStorage.setItem(`p3_bio_enabled_${name}`, '1');
+            checkBiometricButtonVisibility();
+            return;
+        }
         const avail = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
         if (!avail) return;
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
-        const userId = crypto.getRandomValues(new Uint8Array(16));
-        const cred = await navigator.credentials.create({
-            publicKey: {
-                challenge,
-                rp: { name: "P³ App" },
-                user: { id: userId, name, displayName: name },
-                pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-                authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
-                timeout: 30000
-            }
+        const optionsResponse = await fetch('/api/webauthn/register/options', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({})
         });
-        if (cred) {
-            const credentialId = Array.from(new Uint8Array(cred.rawId));
-            localStorage.setItem('p3_bio_vault', JSON.stringify({ name, password, credentialId }));
-            showToast("🔐 FaceID / TouchID enabled for next time!");
-            checkBiometricButtonVisibility();
-        }
-    } catch (e) {}
+        if (!optionsResponse.ok) return;
+        const { options, ceremonyId } = await optionsResponse.json();
+        options.challenge = base64UrlToBuffer(options.challenge);
+        options.user.id = base64UrlToBuffer(options.user.id);
+        options.excludeCredentials = (options.excludeCredentials || []).map(item => ({
+            ...item, id: base64UrlToBuffer(item.id)
+        }));
+        const credential = await navigator.credentials.create({ publicKey: options });
+        if (!credential) return;
+        const verifyResponse = await fetch('/api/webauthn/register/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
+            body: JSON.stringify({ ceremonyId, credential: serializePasskeyCredential(credential) })
+        });
+        const result = await verifyResponse.json();
+        if (!verifyResponse.ok || !result.verified) throw new Error(result.error || 'Passkey registration failed');
+        localStorage.setItem(`p3_bio_enabled_${name}`, '1');
+        showToast('🔐 FaceID / TouchID enabled for this device!');
+        checkBiometricButtonVisibility();
+    } catch (e) {
+        if (e.name !== 'NotAllowedError') showToast(e.message || 'Could not register this passkey.', true);
+    }
 }
 
 async function unlockWithBiometrics() {
-    const vault = readBiometricVault();
-    if (!vault || !window.PublicKeyCredential) return;
+    const name = document.getElementById('login-name').value;
+    if (!window.PublicKeyCredential || !name || name === 'Guest') return;
     try {
-        if (!Array.isArray(vault.credentialId)) throw new Error('No registered biometric credential');
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
-        const assertion = await navigator.credentials.get({
-            publicKey: {
-                challenge,
-                allowCredentials: [{ type: 'public-key', id: new Uint8Array(vault.credentialId) }],
-                userVerification: "required",
-                timeout: 30000
-            }
+        const optionsResponse = await fetch('/api/webauthn/login/options', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
         });
-        if (!(assertion instanceof PublicKeyCredential) ||
-            assertion.rawId.byteLength !== vault.credentialId.length ||
-            !Array.from(new Uint8Array(assertion.rawId)).every((byte, index) => byte === vault.credentialId[index])) {
-            throw new Error('Biometric credential did not match');
-        }
-        document.getElementById('login-name').value = vault.name;
-        document.getElementById('password-input').value = vault.password;
-        await login();
+        const data = await optionsResponse.json();
+        if (!optionsResponse.ok) throw new Error(data.error || 'Could not start passkey login.');
+        data.options.challenge = base64UrlToBuffer(data.options.challenge);
+        data.options.allowCredentials = data.options.allowCredentials.map(item => ({
+            ...item, id: base64UrlToBuffer(item.id)
+        }));
+        const credential = await navigator.credentials.get({ publicKey: data.options });
+        if (!credential) return;
+        const verifyResponse = await fetch('/api/webauthn/login/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ceremonyId: data.ceremonyId, credential: serializePasskeyCredential(credential) })
+        });
+        const result = await verifyResponse.json();
+        if (!verifyResponse.ok || !result.success) throw new Error(result.error || 'Passkey login failed.');
+        await completeLogin(result.name);
     } catch (e) {
-        showToast("Biometric unlock cancelled", true);
+        if (e.name !== 'NotAllowedError') showToast(e.message || 'Passkey unlock failed.', true);
     }
+}
+
+async function completeLogin(name) {
+    userName = name;
+    userPassword = '';
+    localStorage.setItem('userName', userName);
+    localStorage.removeItem('userPassword');
+
+    document.getElementById('login-overlay').style.display = 'none';
+    const welcomeEl = document.getElementById('welcome-text');
+    welcomeEl.innerText = `👤 ${userName} ⇄`;
+    welcomeEl.style.display = 'inline-block';
+
+    registerBiometricIfSupported(userName);
+    fetchIdeas();
+    if (typeof fetchRestaurants === 'function') fetchRestaurants();
+    if (typeof initLdrHub === 'function') initLdrHub();
+    if (typeof checkAutoDailyPrompt === 'function') checkAutoDailyPrompt();
 }
 
 async function login() {
@@ -292,27 +359,19 @@ async function login() {
     const data = await res.json();
 
     if (res.ok && data.success) {
-        userName = name;
-        userPassword = (name === 'Guest') ? 'guest' : pass;
-        localStorage.setItem('userName', userName);
-        localStorage.setItem('userPassword', userPassword);
-
-        document.getElementById('login-overlay').style.display = 'none';
-        const welcomeEl = document.getElementById('welcome-text');
-        welcomeEl.innerText = `👤 ${userName} ⇄`;
-        welcomeEl.style.display = 'inline-block';
-
-        registerBiometricIfSupported(userName, userPassword);
-        fetchIdeas();
-        if (typeof fetchRestaurants === 'function') fetchRestaurants();
-        if (typeof initLdrHub === 'function') initLdrHub();
-        if (typeof checkAutoDailyPrompt === 'function') checkAutoDailyPrompt();
+        await completeLogin(name);
     } else {
         showToast(data.error || "Login failed", true);
     }
 }
 
-function logout() {
+async function logout() {
+    try {
+        const response = await fetch('/api/logout', { method: 'POST' });
+        if (!response.ok) showToast('Could not revoke the server session.', true);
+    } catch (error) {
+        showToast('Could not reach the server to revoke the session.', true);
+    }
     userName = '';
     userPassword = '';
     localStorage.removeItem('userName');

@@ -20,6 +20,9 @@ let cityWeatherCache = {};
 let countdownTimerId = null;
 let hubPollTimerId = null;
 let distanceUnit = localStorage.getItem('p3_distance_unit') === 'mi' ? 'mi' : 'km';
+let flightStatusIdent = '';
+let flightStatusFetchedAt = 0;
+let flightStatusPending = false;
 
 function isPushMuted() { return localStorage.getItem('p3_push_muted') === '1'; }
 function isAutoLocEnabled() { return localStorage.getItem('p3_auto_loc') === '1'; }
@@ -177,12 +180,14 @@ function updateCountdownTick() {
     if (tagEl) tagEl.innerText = label;
 
     const fNum = (hubSettings.flightNumber || '').trim().toUpperCase();
+    const statusEl = document.getElementById('flight-status-details');
     const targetUtcMs = hubSettings.countdownUtcMs
         ? Number(hubSettings.countdownUtcMs)
         : localDateTimeToUtcMs(hubSettings.countdownDate, getTargetTimezoneIANA(hubSettings.countdownTzOwner || 'jenna'));
     const untilArrivalMs = targetUtcMs - Date.now();
+    const isFlightDay = fNum && untilArrivalMs >= 0 && untilArrivalMs <= 86400000;
     if (flightPill) {
-        if (fNum && untilArrivalMs >= 0 && untilArrivalMs <= 86400000) {
+        if (isFlightDay) {
             flightPill.style.display = 'inline-block';
             flightPill.innerText = `✈️ ${fNum}`;
             flightPill.href = `https://www.flightaware.com/live/flight/${encodeURIComponent(fNum)}`;
@@ -190,6 +195,13 @@ function updateCountdownTick() {
         } else {
             flightPill.style.display = 'none';
         }
+    }
+    if (statusEl) {
+        statusEl.style.display = isFlightDay ? 'block' : 'none';
+        if (!isFlightDay) statusEl.innerText = '';
+    }
+    if (isFlightDay && (flightStatusIdent !== fNum || Date.now() - flightStatusFetchedAt >= 300000)) {
+        fetchFlightStatus(fNum);
     }
 
     if (!hubSettings.countdownDate) {
@@ -225,6 +237,45 @@ function updateCountdownTick() {
     const mins = String(Math.floor((diffMs % 3600000) / 60000)).padStart(2, '0');
     const secs = String(Math.floor((diffMs % 60000) / 1000)).padStart(2, '0');
     textEl.innerText = days > 0 ? `${days}d ${hours}h ${mins}m ${secs}s` : `🚨 ${hours}h ${mins}m ${secs}s`;
+}
+
+async function fetchFlightStatus(ident) {
+    if (flightStatusPending) return;
+    flightStatusPending = true;
+    flightStatusIdent = ident;
+    flightStatusFetchedAt = Date.now();
+    const statusEl = document.getElementById('flight-status-details');
+    try {
+        const res = await apiFetch(`/api/flight-status/${encodeURIComponent(ident)}`);
+        const data = await res.json();
+        if (ident !== flightStatusIdent || !statusEl) return;
+        if (!res.ok) {
+            statusEl.innerText = res.status === 503
+                ? 'Add FLIGHTAWARE_API_KEY on the server for live arrival details.'
+                : 'Live arrival details are unavailable right now.';
+            return;
+        }
+        const flight = data.flight;
+        if (!flight) {
+            statusEl.innerText = 'No matching live flight found yet.';
+            return;
+        }
+        const arrival = flight.estimated_in || flight.scheduled_in || flight.actual_in;
+        const arrivalTime = arrival
+            ? new Date(arrival).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+            : '';
+        const details = [
+            flight.status,
+            arrivalTime ? `Arrives ${arrivalTime}` : '',
+            flight.arrival_terminal ? `Terminal ${flight.arrival_terminal}` : '',
+            flight.arrival_gate ? `Gate ${flight.arrival_gate}` : ''
+        ].filter(Boolean);
+        statusEl.innerText = details.join(' · ') || 'Flight details are not available yet.';
+    } catch (e) {
+        if (ident === flightStatusIdent && statusEl) statusEl.innerText = 'Live arrival details are unavailable right now.';
+    } finally {
+        flightStatusPending = false;
+    }
 }
 
 async function saveHubSettings() {
@@ -324,8 +375,10 @@ function renderWeatherTzPill() {
     renderCol(col2, m2, city2, 'America/New_York');
 
     if (distEl && m1 && m2 && Number.isFinite(m1.latitude) && Number.isFinite(m2.latitude)) {
-        const km = calcHaversineKm(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
-        if (km < 1) {
+        const sameCity = city1.trim().toLocaleLowerCase() === city2.trim().toLocaleLowerCase() ||
+            m1.name.trim().toLocaleLowerCase() === m2.name.trim().toLocaleLowerCase();
+        const km = sameCity ? 0 : calcHaversineKm(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
+        if (km === 0) {
             distEl.innerText = '🎉 0 km • Together!';
         } else if (distanceUnit === 'mi') {
             const miles = km * 0.621371;

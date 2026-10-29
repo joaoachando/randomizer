@@ -84,6 +84,17 @@ db.serialize(() => {
             )`);
     db.run(`CREATE TABLE IF NOT EXISTS custom_cuisines (tag TEXT PRIMARY KEY)`);
     db.run(`CREATE TABLE IF NOT EXISTS users (name TEXT PRIMARY KEY, password_hash TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS sessions (
+        token_hash TEXT PRIMARY KEY, user TEXT NOT NULL, expires_at INTEGER NOT NULL
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS webauthn_credentials (
+        credential_id TEXT PRIMARY KEY, user TEXT NOT NULL, public_key TEXT NOT NULL,
+        counter INTEGER NOT NULL DEFAULT 0, transports TEXT NOT NULL DEFAULT '[]', created_at INTEGER NOT NULL
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS webauthn_challenges (
+        id TEXT PRIMARY KEY, user TEXT NOT NULL, purpose TEXT NOT NULL,
+        challenge TEXT NOT NULL, expires_at INTEGER NOT NULL
+    )`);
     db.run(`CREATE TABLE IF NOT EXISTS cycles (
                                                   id INTEGER PRIMARY KEY AUTOINCREMENT, startDate TEXT NOT NULL, endDate TEXT, notes TEXT
             )`);

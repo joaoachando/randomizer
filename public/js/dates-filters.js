@@ -144,17 +144,32 @@ async function initAppOnLoad() {
 async function initAuth() {
     initChipUI();
     const loginOverlay = document.getElementById('login-overlay');
-    if (!userName || !userPassword) {
+    if (userName) document.getElementById('login-name').value = userName;
+    if (!userName) {
         loginOverlay.style.display = 'flex';
         return;
     }
 
     try {
-        const res = await fetch('/api/ideas', {
-            headers: {
-                'x-user-name': userName,
-                'x-user-password': userPassword
+        if (userName !== 'Guest' && userPassword) {
+            const exchange = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: userName, password: userPassword })
+            });
+            const exchangeData = await exchange.json();
+            if (!exchange.ok || !exchangeData.success) {
+                userName = '';
+                userPassword = '';
+                localStorage.removeItem('userName');
+                localStorage.removeItem('userPassword');
+                throw new Error(exchangeData.error || 'Could not refresh the login session.');
             }
+            userPassword = '';
+            localStorage.removeItem('userPassword');
+        }
+        const res = await fetch('/api/ideas', {
+            headers: authHeaders()
         });
         if (!res.ok) {
             if (res.status === 401) {
@@ -179,7 +194,7 @@ async function initAuth() {
     } catch (e) {
         console.error("Auth check failed", e);
         loginOverlay.style.display = 'flex';
-        if (userName && userPassword) {
+        if (userName) {
             showToast('Could not verify your login. Please try again.', true);
         }
     }

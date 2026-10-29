@@ -126,6 +126,7 @@ async function fetchRestaurants() {
         }
         renderRestaurantFormChips();
         renderRestaurantList();
+        if (typeof renderList === 'function') renderList();
         if (typeof checkWrappedVisibility === 'function') checkWrappedVisibility();
     } catch (e) {
         if (!hasLoadedRestaurants) {
@@ -359,7 +360,10 @@ function toggleFoodMapView() {
     const btn = document.getElementById('btn-toggle-map');
     if (wrap) wrap.style.display = isFoodMapViewOpen ? 'block' : 'none';
     if (btn) {
-        btn.innerText = isFoodMapViewOpen ? '📋 List' : '🗺️ Map';
+        const label = btn.querySelector('span');
+        if (label) label.innerText = isFoodMapViewOpen ? 'List' : 'Map';
+        btn.setAttribute('aria-pressed', String(isFoodMapViewOpen));
+        btn.title = isFoodMapViewOpen ? 'Show spots as a list' : 'Show spots on the map';
         btn.style.borderColor = isFoodMapViewOpen ? 'var(--accent)' : '';
         btn.style.color = isFoodMapViewOpen ? 'var(--accent)' : '';
     }

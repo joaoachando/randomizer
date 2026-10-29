@@ -66,7 +66,7 @@
 
     <!-- MASTER DATE LIST & CHRONOLOGICAL SCRAPBOOK -->
     <div class="card">
-        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+        <div class="idea-list-toolbar">
             <input type="text" id="search-ideas" placeholder="🔍 Search dates, trips, memories..." onkeyup="renderList()" style="margin: 0; flex: 1;">
             <select id="sort-ideas" onchange="renderList()" style="margin: 0; width: auto; padding: 10px;">
                 <option value="newest">Newest</option>
@@ -74,6 +74,9 @@
                 <option value="memories">📖 Scrapbook Timeline</option>
                 <option value="spicy">🌶️ Spicy</option>
             </select>
+            <button type="button" class="view-toggle-btn" id="btn-scrapbook-timeline" onclick="toggleScrapbookTimeline()" aria-pressed="false" title="Show completed dates and visited spots as a timeline">
+                <span aria-hidden="true">📖</span><span>Timeline</span>
+            </button>
         </div>
         <div id="master-quick-filters" class="chip-row" style="margin-bottom: 8px;"></div>
         <div id="master-trip-filters" class="chip-row" style="margin-bottom: 12px;"></div>

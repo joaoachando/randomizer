@@ -94,6 +94,7 @@ body {
     color: inherit; font: inherit; font-size: 10px; cursor: pointer;
 }
 .flight-distance-pill:hover { background: rgba(255,255,255,0.08); }
+.flight-status-details { max-width: 190px; text-align: center; font-size: 9px; line-height: 1.35; color: var(--text-main); opacity: 0.72; }
 
 .ldr-dock-footer {
     display: flex; align-items: center; gap: 8px;

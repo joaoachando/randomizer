@@ -127,7 +127,13 @@
                 <option value="todo">📍 To Try</option>
                 <option value="visited">✅ Visited</option>
             </select>
-            <button class="reset-btn" id="btn-toggle-map" onclick="toggleFoodMapView()" style="padding: 10px 13px; font-weight: 700;">🗺️ Map</button>
+            <button type="button" class="view-toggle-btn" id="btn-toggle-map" onclick="toggleFoodMapView()" aria-pressed="false" title="Show spots on the map">
+                <svg class="view-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z"></path>
+                    <path d="M9 3v15m6-12v15"></path>
+                </svg>
+                <span>Map</span>
+            </button>
         </div>
 
         <div id="food-map-wrap" class="food-map-wrap" style="display: none;">
