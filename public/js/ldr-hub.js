@@ -105,6 +105,7 @@ async function fetchHubData() {
         const data = await res.json();
         if (data.settings) hubSettings = { ...hubSettings, ...data.settings };
         if (data.history) hubHistory = data.history;
+        if (showingDailyArchive) renderDailyArchiveList();
         if (data.checklist) {
             visitChecklist = data.checklist;
             renderVisitChecklist();
@@ -462,11 +463,21 @@ async function deleteChecklistItem(id) {
 
 // DAILY "US" PROMPT, REACTIONS & STARRED ARCHIVE
 async function reactToDailyPrompt(emoji) {
+    return toggleDailyPromptReaction(emoji, hubDaily.date);
+}
+
+async function reactToArchivedPrompt(emoji, date) {
+    return toggleDailyPromptReaction(emoji, decodeURIComponent(date));
+}
+
+async function toggleDailyPromptReaction(emoji, date) {
     if (userName === 'Guest') return;
     triggerHaptic(10);
-    const myCurrent = userName === 'Jenna' ? hubDaily.jennaReaction : hubDaily.joaoReaction;
+    const prompt = date === hubDaily.date ? hubDaily : hubHistory.find(item => item.date === date);
+    if (!prompt) return;
+    const myCurrent = userName === 'Jenna' ? prompt.jennaReaction : prompt.joaoReaction;
     const nextEmoji = myCurrent === emoji ? '' : emoji;
-    await apiFetch('/api/hub/daily-react', { method: 'POST', body: JSON.stringify({ date: hubDaily.date, emoji: nextEmoji }) });
+    await apiFetch('/api/hub/daily-react', { method: 'POST', body: JSON.stringify({ date, emoji: nextEmoji }) });
     fetchHubData();
 }
 
@@ -527,6 +538,21 @@ function renderDailyArchiveList() {
     box.innerHTML = filtered.map(item => {
         const cleanDate = (item.date || '').split('#')[0];
         const starIcon = item.isStarred ? '⭐' : '☆';
+        const dateArg = `'${encodeURIComponent(item.date)}'`;
+        const myReact = userName === 'Jenna' ? item.jennaReaction : item.joaoReaction;
+        const joaoReaction = item.jennaReaction
+            ? `<span class="daily-archive-reaction" title="Jenna reacted to João's answer">Jenna ${item.jennaReaction}</span>`
+            : '';
+        const jennaReaction = item.joaoReaction
+            ? `<span class="daily-archive-reaction" title="João reacted to Jenna's answer">João ${item.joaoReaction}</span>`
+            : '';
+        const reactBar = userName === 'Guest' ? '' : `<div class="reaction-bar daily-archive-reaction-bar">
+            ${['❤️', '😂', '🥹', '🔥'].map(em =>
+                `<button class="react-btn ${myReact === em ? 'active' : ''}" aria-label="React ${em}" title="React ${em}" onclick="reactToArchivedPrompt('${em}', ${dateArg})">${em}</button>`
+            ).join('')}
+        </div>`;
+        const joaoReactionControls = userName === 'Jenna' ? reactBar : '';
+        const jennaReactionControls = userName === 'Joao' ? reactBar : '';
         return `
             <div class="daily-ans-card done" style="padding: 11px;">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:4px;">
@@ -536,8 +562,8 @@ function renderDailyArchiveList() {
                         <button class="reset-btn" onclick="toggleArchivePromptStar('${item.date}', ${Boolean(item.isStarred)})" style="padding:1px 6px;font-size:11px;">${starIcon}</button>
                     </div>
                 </div>
-                <div style="font-size:12px;margin-top:4px;"><b>João:</b> ${linkify(item.joaoAnswer)} ${item.jennaReaction || ''}</div>
-                <div style="font-size:12px;margin-top:2px;"><b>Jenna:</b> ${linkify(item.jennaAnswer)} ${item.joaoReaction || ''}</div>
+                <div class="daily-archive-answer"><b>João:</b> ${linkify(item.joaoAnswer)} ${joaoReaction}${joaoReactionControls}</div>
+                <div class="daily-archive-answer"><b>Jenna:</b> ${linkify(item.jennaAnswer)} ${jennaReaction}${jennaReactionControls}</div>
             </div>
         `;
     }).join('');
