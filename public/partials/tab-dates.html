@@ -66,6 +66,10 @@
 
     <!-- MASTER DATE LIST & CHRONOLOGICAL SCRAPBOOK -->
     <div class="card list-card">
+        <div class="saved-list-heading">
+            <h3>Saved Date Ideas</h3>
+            <button type="button" class="reset-btn" id="btn-toggle-idea-list" aria-expanded="false" aria-controls="idea-list-content" onclick="toggleSavedList('idea-list-content', 'btn-toggle-idea-list', 'Show ideas', 'Hide ideas')">＋ Show ideas</button>
+        </div>
         <div class="idea-list-toolbar">
             <input type="text" id="search-ideas" placeholder="🔍 Search dates, trips, memories..." onkeyup="renderList()">
             <select id="sort-ideas" onchange="renderList()">
@@ -78,8 +82,10 @@
                 <span aria-hidden="true">📖</span><span>Timeline</span>
             </button>
         </div>
-        <div id="master-quick-filters" class="chip-row" style="margin-bottom: 8px;"></div>
-        <div id="master-trip-filters" class="chip-row" style="margin-bottom: 12px;"></div>
-        <ul id="idea-ul" class="idea-list"></ul>
+        <div id="idea-list-content" hidden>
+            <div id="master-quick-filters" class="chip-row" style="margin-bottom: 8px;"></div>
+            <div id="master-trip-filters" class="chip-row" style="margin-bottom: 12px;"></div>
+            <ul id="idea-ul" class="idea-list"></ul>
+        </div>
     </div>
 </div>

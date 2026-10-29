@@ -187,6 +187,16 @@ async function flushOfflineOutbox() {
 }
 window.addEventListener('online', flushOfflineOutbox);
 
+function toggleSavedList(contentId, buttonId, showLabel, hideLabel) {
+    const content = document.getElementById(contentId);
+    const button = document.getElementById(buttonId);
+    if (!content || !button) return;
+    const expanded = content.hidden;
+    content.hidden = !expanded;
+    button.setAttribute('aria-expanded', String(expanded));
+    button.innerText = `${expanded ? '−' : '＋'} ${expanded ? hideLabel : showLabel}`;
+}
+
 function switchTab(tabId) {
     triggerHaptic(8);
     requestDeviceMotionAccess();
