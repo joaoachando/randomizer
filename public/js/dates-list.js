@@ -313,7 +313,7 @@ function renderList() {
         let badges = i.isSecret ? authorBadge : `${authorBadge}${tripBadge}<span class="badge">${i.location}</span><span class="badge">${i.budget}</span><span class="badge">${i.vibe}</span>${spicyBadge}`;
 
         const doneStyle = i.isDone ? 'text-decoration: line-through; opacity: 0.7;' : '';
-        const doneIcon = `<button class="action-btn" onclick="markAsDone(${i.id})" title="Log Memory">${i.isDone ? '💝' : '✅'}</button>`;
+        const doneIcon = `<button class="action-btn action-btn-complete ${i.isDone ? 'is-complete' : ''}" onclick="markAsDone(${i.id})" title="${i.isDone ? 'Edit memory' : 'Mark date complete'}" aria-label="${i.isDone ? 'Edit memory' : 'Mark date complete'}">${i.isDone ? '💝' : '<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>'}</button>`;
 
         const splitR = (i.joaoRating && i.jennaRating) ? `João:${i.joaoRating}❤️ Jenna:${i.jennaRating}❤️` : '❤️'.repeat(i.rating || 5);
         const completedBadge = i.isDone
@@ -327,12 +327,14 @@ function renderList() {
         const photoHtml = (i.isDone && i.photoData) ? `<img src="${i.photoData}" class="memory-photo-img" alt="Date memory" loading="lazy">` : '';
 
         li.innerHTML = `
-            <div class="action-bar">
-                ${doneIcon}
-                <button class="action-btn" onclick="editIdea(${i.id})" title="Edit">✏️</button>
-                <button class="action-btn" onclick="deleteIdea(${i.id})" title="Delete">🗑️</button>
+            <div class="idea-item-header">
+                <div class="idea-item-title" style="${doneStyle}">${displayTitle}</div>
+                <div class="action-bar">
+                    ${doneIcon}
+                    <button class="action-btn action-btn-edit" onclick="editIdea(${i.id})" title="Edit date idea" aria-label="Edit date idea"><svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"/></svg></button>
+                    <button class="action-btn action-btn-delete" onclick="deleteIdea(${i.id})" title="Delete date idea" aria-label="Delete date idea"><svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"/></svg></button>
+                </div>
             </div>
-            <div style="font-weight: 700; padding-right: 90px; ${doneStyle}">${displayTitle}</div>
             ${displayDesc}
             ${memoryHtml}
             ${photoHtml}

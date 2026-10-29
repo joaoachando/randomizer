@@ -246,9 +246,47 @@ a.badge:hover { border-color: var(--accent); color: var(--accent); background: r
     font-size: 10px; font-weight: 700; color: #34d399; opacity: 0.85;
     white-space: nowrap; display: inline-flex; align-items: center; gap: 3px;
 }
-.action-bar { position: absolute; top: 12px; right: 12px; display: flex; gap: 4px; }
-.action-btn { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); color: var(--text-main); border-radius: 8px; cursor: pointer; font-size: 13px; padding: 4px 7px; opacity: 0.75; }
-.action-btn:hover { opacity: 1; border-color: var(--accent); }
+.action-bar {
+    display: flex; align-items: center; gap: 3px; padding: 4px;
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-card) 92%, #000);
+    flex: 0 0 auto;
+}
+.idea-item-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 10px; min-width: 0;
+}
+.idea-item-title {
+    flex: 1; min-width: 0; overflow-wrap: anywhere;
+    font-weight: 700; line-height: 1.4;
+}
+.action-btn {
+    display: inline-grid; place-items: center; width: 30px; height: 30px;
+    padding: 0; border: 1px solid transparent; border-radius: 9px;
+    background: transparent; color: var(--text-main); opacity: 0.76;
+    font: inherit; font-size: 16px; font-weight: 700; line-height: 1;
+    cursor: pointer; transition: background 0.15s, color 0.15s, opacity 0.15s, transform 0.15s;
+}
+.action-btn:hover { opacity: 1; background: rgba(255,255,255,0.08); }
+.action-btn:active { transform: scale(0.94); }
+.action-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.action-icon {
+    width: 16px; height: 16px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.action-btn-complete { color: #34d399; }
+.action-btn-complete:hover, .action-btn-complete.is-complete {
+    background: rgba(52,211,153,0.13); color: #6ee7b7;
+}
+.action-btn-edit { color: var(--accent); }
+.action-btn-edit:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.action-btn-delete { color: #fda4af; }
+.action-btn-delete:hover { color: #fb7185; background: rgba(244,63,94,0.14); }
+@media (max-width: 380px) {
+    .idea-item-header { gap: 6px; }
+    .action-bar { gap: 1px; padding: 3px; }
+    .action-btn { width: 27px; height: 29px; }
+}
 
 .ldr-drawer { border: 1px solid var(--accent); border-radius: 20px; padding: 16px; margin-top: 10px; }
 .ldr-drawer-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }

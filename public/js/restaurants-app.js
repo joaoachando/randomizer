@@ -514,16 +514,18 @@ function renderRestaurantList() {
 
         return `
             <li class="idea-item">
-                <div class="action-bar">
-                    <button class="action-btn" onclick="markRestaurantVisited(${r.id})" title="Log Visit">${r.isVisited ? '💝' : '✅'}</button>
-                    <button class="action-btn" onclick="editRestaurant(${r.id})" title="Edit">✏️</button>
-                    <button class="action-btn" onclick="deleteRestaurant(${r.id})" title="Delete">🗑️</button>
-                </div>
                 <div class="spot-card-flex">
                     ${thumbHtml}
                     <div style="flex: 1; min-width: 0;">
-                        <div style="font-weight: 700; padding-right: 86px; ${r.isVisited ? 'opacity:0.75;' : ''}">
-                            ${r.name} <span style="font-weight:500;opacity:0.75;font-size:12px;">• ${r.city}</span>
+                        <div class="idea-item-header">
+                            <div class="idea-item-title" style="${r.isVisited ? 'opacity:0.75;' : ''}">
+                                ${r.name} <span style="font-weight:500;opacity:0.75;font-size:12px;">• ${r.city}</span>
+                            </div>
+                            <div class="action-bar">
+                                <button class="action-btn action-btn-complete ${r.isVisited ? 'is-complete' : ''}" onclick="markRestaurantVisited(${r.id})" title="${r.isVisited ? 'Edit visit memory' : 'Mark spot visited'}" aria-label="${r.isVisited ? 'Edit visit memory' : 'Mark spot visited'}">${r.isVisited ? '💝' : '<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>'}</button>
+                                <button class="action-btn action-btn-edit" onclick="editRestaurant(${r.id})" title="Edit spot" aria-label="Edit spot"><svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5 4 4M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z"/></svg></button>
+                                <button class="action-btn action-btn-delete" onclick="deleteRestaurant(${r.id})" title="Delete spot" aria-label="Delete spot"><svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"/></svg></button>
+                            </div>
                         </div>
                         ${r.mustOrder ? `<div style="font-size: 12.5px; opacity: 0.88; margin-top: 3px;">💡 <b>${r.spotType === 'cook' ? 'Ingredients/Notes:' : 'Order/Note:'}</b> ${linkify(r.mustOrder)}</div>` : ''}
                         ${r.isVisited && r.review ? `<div class="memory-quote">“${linkify(r.review)}”</div>` : ''}
