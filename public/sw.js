@@ -1,7 +1,15 @@
-self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('install', (event) => {
+    if (!self.registration.active) event.waitUntil(self.skipWaiting());
+});
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener('fetch', () => {});
+
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        event.waitUntil(self.skipWaiting());
+    }
+});
 
 self.addEventListener('push', (event) => {
     let data = { title: 'P³ 🤍', body: 'New update from your partner!' };

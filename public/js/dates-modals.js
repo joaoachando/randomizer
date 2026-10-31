@@ -57,11 +57,11 @@ function renderHeartSelector() {
             const isOwnRating = (userName === 'Joao' && who === 'joao') ||
                 (userName === 'Jenna' && who === 'jenna');
             const stars = [1, 2, 3, 4, 5].map(n =>
-                `<span ${isOwnRating
+                `<span class="memory-heart" ${isOwnRating
                     ? `onclick="setPartnerHeart('${who}', ${n})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setPartnerHeart('${who}', ${n})}" role="button" tabindex="0" aria-label="Rate ${n} out of 5" style="cursor:pointer;"`
                     : ''}>${n <= rating ? '❤️' : '🤍'}</span>`
             ).join('');
-            return `${stars}${rating ? '' : '<small style="font-size:10px;opacity:.65;">Not rated</small>'}`;
+            return `${stars}${rating ? '' : '<small>Not rated</small>'}`;
         };
         jRow.innerHTML = renderRow('joao', selectedJoaoRating);
         jeRow.innerHTML = renderRow('jenna', selectedJennaRating);

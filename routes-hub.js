@@ -384,18 +384,24 @@ module.exports = function(requireAuth) {
                     ...(Array.isArray(item.codeshares_iata) ? item.codeshares_iata : [])
                 ];
                 return idents.some(value => String(value || '').toUpperCase() === ident);
-            }) || flights[0];
+            });
             if (!flight) return res.json({ flight: null });
             res.json({
                 flight: {
                     ident: flight.ident,
                     status: flight.status,
+                    origin: flight.origin?.code_iata || flight.origin?.code || flight.origin?.name || '',
+                    origin_timezone: flight.origin?.timezone || '',
+                    destination: flight.destination?.city || flight.destination?.name || flight.destination?.code_iata || flight.destination?.code || '',
+                    destination_timezone: flight.destination?.timezone || '',
+                    scheduled_out: flight.scheduled_out || flight.scheduled_off,
+                    estimated_out: flight.estimated_out || flight.estimated_off,
+                    actual_out: flight.actual_out || flight.actual_off,
                     scheduled_in: flight.scheduled_in || flight.scheduled_on,
                     estimated_in: flight.estimated_in || flight.estimated_on,
                     actual_in: flight.actual_in || flight.actual_on,
                     arrival_terminal: flight.arrival_terminal || flight.terminal_destination,
-                    arrival_gate: flight.arrival_gate || flight.gate_destination,
-                    destination_timezone: flight.destination?.timezone || ''
+                    arrival_gate: flight.arrival_gate || flight.gate_destination
                 }
             });
         } catch (e) {

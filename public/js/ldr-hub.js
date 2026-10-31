@@ -20,6 +20,7 @@ let myExactLocation = null;
 let flightStatusIdent = '';
 let flightStatusFetchedAt = 0;
 let flightStatusPending = false;
+let flightStatusData = null;
 
 function isPushMuted() { return localStorage.getItem('p3_push_muted') === '1'; }
 function isAutoLocEnabled() { return localStorage.getItem('p3_auto_loc') === '1'; }
@@ -113,6 +114,7 @@ async function fetchHubData() {
             renderDailyQuestionBox();
         }
         renderJennaLastActive();
+        if (document.getElementById('hub-drawer-timeline')?.style.display === 'block') renderTravelTimeline();
         updateCountdownTick();
         if (typeof syncCountdownToTripChecker === 'function') syncCountdownToTripChecker();
 
@@ -145,7 +147,7 @@ function renderJennaLastActive() {
 
 function toggleHubDrawer(which) {
     triggerHaptic(8);
-    ['daily', 'prep', 'settings'].forEach(k => {
+    ['daily', 'prep', 'timeline', 'settings'].forEach(k => {
         const el = document.getElementById(`hub-drawer-${k}`);
         if (!el) return;
         if (k === which) {
@@ -157,6 +159,7 @@ function toggleHubDrawer(which) {
                 document.getElementById('set-cd-date').value = savedDt.includes('T') ? savedDt : (savedDt ? `${savedDt}T12:00` : '');
                 document.getElementById('set-cd-tz').value = hubSettings.countdownTzOwner || 'jenna';
                 document.getElementById('set-cd-flight').value = hubSettings.flightNumber || '';
+                document.getElementById('set-pickup-plan').value = hubSettings.pickupPlan || '';
                 document.getElementById('set-city-joao').value = hubSettings.cityJoao || 'Lisbon';
                 document.getElementById('set-city-jenna').value = hubSettings.cityJenna || 'Fairfax';
                 const locToggle = document.getElementById('auto-loc-toggle');
@@ -166,6 +169,7 @@ function toggleHubDrawer(which) {
             el.style.display = 'none';
         }
     });
+    if (which === 'timeline') renderTravelTimeline();
 }
 
 function updateCountdownTick() {
@@ -184,7 +188,12 @@ function updateCountdownTick() {
         ? Number(hubSettings.countdownUtcMs)
         : localDateTimeToUtcMs(hubSettings.countdownDate, getTargetTimezoneIANA(hubSettings.countdownTzOwner || 'jenna'));
     const untilArrivalMs = targetUtcMs - Date.now();
-    const isFlightDay = fNum && untilArrivalMs >= 0 && untilArrivalMs <= 86400000;
+    if (fNum !== flightStatusIdent) {
+        flightStatusIdent = '';
+        flightStatusData = null;
+        flightStatusFetchedAt = 0;
+    }
+    const isFlightDay = fNum && untilArrivalMs >= -86400000 && untilArrivalMs <= 86400000;
     if (flightPill) {
         if (isFlightDay) {
             flightPill.style.display = 'inline-block';
@@ -256,9 +265,12 @@ async function fetchFlightStatus(ident) {
         }
         const flight = data.flight;
         if (!flight) {
+            flightStatusData = null;
             statusEl.innerText = 'No matching live flight found yet.';
+            renderTravelTimeline();
             return;
         }
+        flightStatusData = flight;
         const arrival = flight.actual_in || flight.estimated_in || flight.scheduled_in;
         let arrivalTime = '';
         if (arrival) {
@@ -282,8 +294,12 @@ async function fetchFlightStatus(ident) {
             flight.arrival_gate ? `Gate ${flight.arrival_gate}` : ''
         ].filter(Boolean);
         statusEl.innerText = details.join(' · ') || 'Flight details are not available yet.';
+        renderTravelTimeline();
     } catch (e) {
-        if (ident === flightStatusIdent && statusEl) statusEl.innerText = 'Live arrival details are unavailable right now.';
+        if (ident === flightStatusIdent && statusEl) {
+            statusEl.innerText = 'Live arrival details are unavailable right now.';
+            renderTravelTimeline();
+        }
     } finally {
         flightStatusPending = false;
     }
@@ -310,14 +326,96 @@ async function saveHubSettings() {
     const payload = {
         countdownTitle: document.getElementById('set-cd-title').value.trim() || 'Next Visit',
         countdownDate, countdownTzOwner, countdownUtcMs, countdownStartMs,
-        flightNumber, cityJoao, cityJenna
+        flightNumber, pickupPlan: document.getElementById('set-pickup-plan').value.trim(),
+        cityJoao, cityJenna
     };
+    if (flightNumber !== hubSettings.flightNumber) {
+        flightStatusIdent = '';
+        flightStatusData = null;
+        flightStatusFetchedAt = 0;
+    }
     await apiFetch('/api/hub/settings', { method: 'POST', body: JSON.stringify(payload) });
     hubSettings = { ...hubSettings, ...payload };
     document.getElementById('hub-drawer-settings').style.display = 'none';
     updateCountdownTick();
     if (typeof syncCountdownToTripChecker === 'function') syncCountdownToTripChecker();
+    renderTravelTimeline();
     showToast("Synced countdown & flight saved! ✈️");
+}
+
+function formatTimelineTime(value, timeZone) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    try {
+        return new Intl.DateTimeFormat([], {
+            timeZone: timeZone || undefined,
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        }).format(date);
+    } catch (e) {
+        return date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    }
+}
+
+function renderTravelTimeline() {
+    const box = document.getElementById('travel-timeline-content');
+    if (!box) return;
+
+    const flightNumber = (hubSettings.flightNumber || '').trim().toUpperCase();
+    const arrivalMs = hubSettings.countdownUtcMs
+        ? Number(hubSettings.countdownUtcMs)
+        : localDateTimeToUtcMs(hubSettings.countdownDate, getTargetTimezoneIANA(hubSettings.countdownTzOwner || 'jenna'));
+    const arrivalFallback = arrivalMs
+        ? formatTimelineTime(arrivalMs, getTargetTimezoneIANA(hubSettings.countdownTzOwner || 'jenna'))
+        : '';
+    const flight = flightStatusData;
+    const depTime = formatTimelineTime(
+        flight?.actual_out || flight?.estimated_out || flight?.scheduled_out,
+        flight?.origin_timezone
+    );
+    const arrTime = formatTimelineTime(
+        flight?.actual_in || flight?.estimated_in || flight?.scheduled_in,
+        flight?.destination_timezone
+    ) || arrivalFallback;
+    const route = [flight?.origin, flight?.destination].filter(Boolean).join(' → ');
+    const prepItems = visitChecklist || [];
+    const hasArrival = Boolean(hubSettings.countdownDate);
+
+    box.innerHTML = `
+        <div class="travel-timeline-event">
+            <div class="travel-timeline-title">🧳 Before departure · Visit prep</div>
+            <div class="travel-timeline-detail">${prepItems.length
+                ? `${prepItems.filter(item => item.isDone).length} of ${prepItems.length} items ready`
+                : 'No visit-prep items yet.'}
+                <button class="reset-btn" type="button" onclick="toggleHubDrawer('prep')" style="padding:3px 8px;margin-left:5px;">Open checklist</button>
+            </div>
+            ${prepItems.map(item => `
+                <label class="travel-timeline-check">
+                    <input type="checkbox" ${item.isDone ? 'checked' : ''} onchange="toggleChecklistItem(${Number(item.id)}, this.checked)">
+                    <span style="${item.isDone ? 'text-decoration:line-through;opacity:.6;' : ''}">${linkify(item.text)} <small>(${item.category === 'get' ? 'Get/Buy' : item.category === 'ready' ? 'Have Ready' : 'Bring'})</small></span>
+                </label>
+            `).join('')}
+        </div>
+        <div class="travel-timeline-event">
+            <div class="travel-timeline-title">🛫 Flight${flightNumber ? ` · ${flightNumber}` : ''}</div>
+            <div class="travel-timeline-detail">${flight
+                ? `${linkify(flight.status || 'Status available')}${route ? ` · ${linkify(route)}` : ''}${depTime ? `<br>Departure: ${depTime}` : ''}`
+                : (flightNumber ? 'Live flight details will appear during the 24 hours before arrival.' : 'Add a flight number in countdown settings to show live status.')}</div>
+        </div>
+        <div class="travel-timeline-event">
+            <div class="travel-timeline-title">🛬 Airport arrival${flight?.destination ? ` · ${linkify(flight.destination)}` : ''}</div>
+            <div class="travel-timeline-detail">${hasArrival
+                ? `${arrTime || 'Arrival time saved'}${flight?.arrival_terminal ? ` · Terminal ${linkify(flight.arrival_terminal)}` : ''}${flight?.arrival_gate ? ` · Gate ${linkify(flight.arrival_gate)}` : ''}`
+                : 'Set an arrival date and time in countdown settings.'}</div>
+        </div>
+        <div class="travel-timeline-event">
+            <div class="travel-timeline-title">🚗 Pickup</div>
+            <div class="travel-timeline-detail">${hubSettings.pickupPlan
+                ? linkify(hubSettings.pickupPlan)
+                : `Add a pickup plan in countdown settings.${arrTime ? ` Plan around arrival at ${arrTime}.` : ''}`}</div>
+        </div>
+    `;
 }
 
 function weatherCodeToIcon(code) {

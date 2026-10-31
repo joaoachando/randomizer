@@ -98,7 +98,7 @@ body {
 .flight-status-details { max-width: 190px; text-align: center; font-size: 9px; line-height: 1.35; color: var(--text-main); opacity: 0.72; }
 
 .ldr-dock-footer {
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     padding: 8px 12px; background: rgba(0, 0, 0, 0.18);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -106,6 +106,28 @@ body {
     flex: 1; display: flex; justify-content: space-between; align-items: center;
     background: transparent; color: var(--text-main); border: none;
     padding: 4px 6px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+@media (max-width: 560px) {
+    .ldr-bridge-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 1fr);
+        gap: 6px;
+        padding: 14px 12px 12px;
+    }
+    .ldr-city-col { min-width: 0; }
+    .ldr-city-name { font-size: 9px; letter-spacing: 0.7px; overflow-wrap: anywhere; }
+    .ldr-city-time { font-size: clamp(15px, 4.4vw, 20px); }
+    .ldr-flight-center { min-width: 0; padding: 0 2px; }
+    .ldr-countdown-mono { max-width: 100%; padding: 4px 7px; font-size: clamp(9px, 2.45vw, 11.5px); }
+    .ldr-dock-footer { justify-content: center; }
+    .ldr-daily-bar { flex: 1 1 100%; min-width: 0; gap: 8px; }
+    .ldr-daily-left { min-width: 0; }
+    .ldr-status-chip { min-width: 0; }
+}
+@media (max-width: 380px) {
+    .ldr-bridge-grid { gap: 4px; padding-right: 9px; padding-left: 9px; }
+    .ldr-city-time { font-size: 15px; }
+    .ldr-city-name { font-size: 8px; letter-spacing: 0.5px; }
+    .ldr-status-chip { max-width: 58%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 .ldr-daily-left { display: flex; align-items: center; gap: 7px; }
 .ldr-status-chip { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, 0.06); color: var(--text-main); }

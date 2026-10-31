@@ -38,9 +38,24 @@
 <div id="app-tracker"></div>
 
 <script>
+    window.deferredPwaInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        window.deferredPwaInstallPrompt = event;
+        const button = document.getElementById('btn-install-app');
+        if (button) button.style.display = 'inline-flex';
+    });
+    window.addEventListener('appinstalled', () => {
+        window.deferredPwaInstallPrompt = null;
+        const button = document.getElementById('btn-install-app');
+        if (button) button.style.display = 'none';
+    });
+
     async function bootApp() {
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(() => {});
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => { window.pwaServiceWorkerRegistration = registration; })
+                .catch(error => console.warn('PWA service worker registration failed:', error));
         }
 
         const parts = [
@@ -79,7 +94,8 @@
             '/js/tracker-cal-grid.js',
             '/js/tracker-cal-chips.js',
             '/js/tracker-hero.js',
-            '/js/tracker-breather.js'
+            '/js/tracker-breather.js',
+            '/js/pwa.js'
         ];
         for (const src of scripts) {
             await new Promise(resolve => {
