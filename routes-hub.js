@@ -84,35 +84,16 @@ function notifyPartner(sender, title, body) {
 }
 
 async function fetchSocialThumbnail(url) {
-    if (!url || !url.startsWith('http')) return '';
+    let parsed;
+    try { parsed = new URL(url); } catch (e) { return ''; }
+    if (parsed.protocol !== 'https:' || !/(^|\.)tiktok\.com$/i.test(parsed.hostname)) return '';
     try {
-        if (url.includes('tiktok.com')) {
-            const oRes = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`);
-            if (oRes.ok) {
-                const oData = await oRes.json();
-                if (oData.thumbnail_url) return oData.thumbnail_url;
-            }
+        const oRes = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(parsed.href)}`);
+        if (oRes.ok) {
+            const oData = await oRes.json();
+            if (oData.thumbnail_url) return oData.thumbnail_url;
         }
-        if (url.includes('instagram.com')) {
-            const accessToken = process.env.META_OEMBED_ACCESS_TOKEN ||
-                (process.env.META_APP_ID && process.env.META_APP_SECRET
-                    ? `${process.env.META_APP_ID}|${process.env.META_APP_SECRET}`
-                    : '');
-            if (accessToken) {
-                const endpoint = new URL(`https://graph.facebook.com/${process.env.META_GRAPH_API_VERSION || 'v22.0'}/instagram_oembed`);
-                endpoint.searchParams.set('url', url);
-                endpoint.searchParams.set('access_token', accessToken);
-                const oRes = await fetch(endpoint);
-                if (oRes.ok) {
-                    const oData = await oRes.json();
-                    if (oData.thumbnail_url) return oData.thumbnail_url;
-                }
-            }
-        }
-        const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; P3Bot/1.0)' } });
-        const html = await res.text();
-        const ogImg = html.match(/property="og:image"\s+content="([^"]+)"/i) || html.match(/content="([^"]+)"\s+property="og:image"/i);
-        return ogImg && ogImg[1] ? ogImg[1].replace(/&amp;/g, '&') : '';
+        return '';
     } catch (e) {
         return '';
     }
@@ -393,17 +374,28 @@ module.exports = function(requireAuth) {
             const response = await fetch(endpoint, { headers: { 'x-apikey': apiKey } });
             if (!response.ok) return res.status(502).json({ error: 'Flight tracking provider is unavailable.' });
             const payload = await response.json();
-            const flight = (payload.flights || []).find(item => item.ident?.toUpperCase() === ident) || payload.flights?.[0];
+            const flights = Array.isArray(payload.flights) ? payload.flights : [];
+            const flight = flights.find(item => {
+                const idents = [
+                    item.ident,
+                    item.ident_icao,
+                    item.ident_iata,
+                    ...(Array.isArray(item.codeshares) ? item.codeshares : []),
+                    ...(Array.isArray(item.codeshares_iata) ? item.codeshares_iata : [])
+                ];
+                return idents.some(value => String(value || '').toUpperCase() === ident);
+            }) || flights[0];
             if (!flight) return res.json({ flight: null });
             res.json({
                 flight: {
                     ident: flight.ident,
                     status: flight.status,
-                    scheduled_in: flight.scheduled_in,
-                    estimated_in: flight.estimated_in,
-                    actual_in: flight.actual_in,
-                    arrival_terminal: flight.arrival_terminal,
-                    arrival_gate: flight.arrival_gate
+                    scheduled_in: flight.scheduled_in || flight.scheduled_on,
+                    estimated_in: flight.estimated_in || flight.estimated_on,
+                    actual_in: flight.actual_in || flight.actual_on,
+                    arrival_terminal: flight.arrival_terminal || flight.terminal_destination,
+                    arrival_gate: flight.arrival_gate || flight.gate_destination,
+                    destination_timezone: flight.destination?.timezone || ''
                 }
             });
         } catch (e) {

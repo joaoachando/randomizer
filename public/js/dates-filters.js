@@ -183,6 +183,7 @@ async function initAuth() {
         }
 
         loginOverlay.style.display = 'none';
+        await flushOfflineOutbox();
         const welcomeEl = document.getElementById('welcome-text');
         welcomeEl.innerText = `👤 ${userName} ⇄`;
         welcomeEl.style.display = 'inline-flex';

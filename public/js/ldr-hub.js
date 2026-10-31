@@ -16,6 +16,7 @@ let cityWeatherCache = {};
 let countdownTimerId = null;
 let hubPollTimerId = null;
 let distanceUnit = localStorage.getItem('p3_distance_unit') === 'mi' ? 'mi' : 'km';
+let myExactLocation = null;
 let flightStatusIdent = '';
 let flightStatusFetchedAt = 0;
 let flightStatusPending = false;
@@ -258,10 +259,22 @@ async function fetchFlightStatus(ident) {
             statusEl.innerText = 'No matching live flight found yet.';
             return;
         }
-        const arrival = flight.estimated_in || flight.scheduled_in || flight.actual_in;
-        const arrivalTime = arrival
-            ? new Date(arrival).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-            : '';
+        const arrival = flight.actual_in || flight.estimated_in || flight.scheduled_in;
+        let arrivalTime = '';
+        if (arrival) {
+            const arrivalDate = new Date(arrival);
+            try {
+                arrivalTime = flight.destination_timezone
+                    ? new Intl.DateTimeFormat([], {
+                        timeZone: flight.destination_timezone,
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    }).format(arrivalDate)
+                    : arrivalDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            } catch (e) {
+                arrivalTime = arrivalDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            }
+        }
         const details = [
             flight.status,
             arrivalTime ? `Arrives ${arrivalTime}` : '',
@@ -375,7 +388,20 @@ function renderWeatherTzPill() {
     if (distEl && m1 && m2 && Number.isFinite(m1.latitude) && Number.isFinite(m2.latitude)) {
         const sameCity = city1.trim().toLocaleLowerCase() === city2.trim().toLocaleLowerCase() ||
             m1.name.trim().toLocaleLowerCase() === m2.name.trim().toLocaleLowerCase();
-        const km = sameCity ? 0 : calcHaversineKm(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
+        const isAutoLocationEnabled = isAutoLocEnabled() && Boolean(myExactLocation) &&
+            (userName === 'Joao' || userName === 'Jenna');
+        const point1 = isAutoLocationEnabled && userName === 'Joao'
+            ? myExactLocation
+            : { latitude: m1.latitude, longitude: m1.longitude };
+        const point2 = isAutoLocationEnabled && userName === 'Jenna'
+            ? myExactLocation
+            : { latitude: m2.latitude, longitude: m2.longitude };
+        const km = sameCity ? 0 : calcHaversineKm(
+            point1.latitude, point1.longitude, point2.latitude, point2.longitude
+        );
+        distEl.title = isAutoLocationEnabled
+            ? `Distance from your current GPS location to ${userName === 'Joao' ? city2 : city1} city center`
+            : 'Distance between city centers; switch between kilometers and miles';
         if (km === 0) {
             distEl.innerText = '🎉 0 km • Together!';
         } else if (distanceUnit === 'mi') {
@@ -475,6 +501,8 @@ async function syncMyCityFromLocation(silent = false) {
         async (pos) => {
             try {
                 const { latitude, longitude } = pos.coords;
+                myExactLocation = { latitude, longitude };
+                renderWeatherTzPill();
                 const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
                 const data = await res.json();
                 const detectedCity = (data.city || data.locality || data.principalSubdivision || '').trim();
@@ -497,7 +525,13 @@ async function syncMyCityFromLocation(silent = false) {
             } catch (e) { if (btn && !silent) btn.innerText = '🧭 Locate Me'; }
         },
         () => { if (btn && !silent) btn.innerText = '🧭 Locate Me'; },
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+        (error) => {
+            myExactLocation = null;
+            renderWeatherTzPill();
+            if (btn && !silent) btn.innerText = '🧭 Locate Me';
+            if (!silent) showToast(error.message || 'Could not access your current location.', true);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
 }
 

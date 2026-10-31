@@ -289,19 +289,31 @@ module.exports = function(requireAuth, hashPassword, ALLOWED_NAMES, notifyPartne
     });
 
     router.patch('/ideas/:id/done', requireAuth, (req, res) => {
-        const { rating, joaoRating, jennaRating, memory, completedDate, photoData } = req.body || {};
-        const jR = Number(joaoRating) || Number(rating) || 5;
-        const jeR = Number(jennaRating) || Number(rating) || 5;
-        const avgR = Math.round((jR + jeR) / 2);
-
-        db.run(
-            'UPDATE ideas SET isDone = 1, isPinned = 0, rating = ?, joaoRating = ?, jennaRating = ?, memory = ?, completedDate = ?, photoData = ? WHERE id = ?',
-            [avgR, jR, jeR, memory || '', completedDate || new Date().toISOString().split('T')[0], photoData || '', req.params.id],
-            (err) => {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ success: true });
-            }
-        );
+        const { rating, memory, completedDate, photoData } = req.body || {};
+        const ownRating = Number(rating);
+        if (!Number.isInteger(ownRating) || ownRating < 0 || ownRating > 5) {
+            return res.status(400).json({ error: 'Rating must be an integer from 0 to 5.' });
+        }
+        const ownColumn = req.user === 'Jenna' ? 'jennaRating' : 'joaoRating';
+        const otherColumn = req.user === 'Jenna' ? 'joaoRating' : 'jennaRating';
+        db.get(`SELECT ${ownColumn}, ${otherColumn} FROM ideas WHERE id = ?`, [req.params.id], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!row) return res.status(404).json({ error: 'Date idea not found.' });
+            const savedOwnRating = ownRating || Number(row[ownColumn]) || 0;
+            const partnerRating = Number(row[otherColumn]) || 0;
+            const ratings = [savedOwnRating, partnerRating].filter(value => value > 0);
+            const averageRating = ratings.length
+                ? Math.round(ratings.reduce((sum, value) => sum + value, 0) / ratings.length)
+                : 0;
+            db.run(
+                `UPDATE ideas SET isDone = 1, isPinned = 0, rating = ?, ${ownColumn} = ?, memory = ?, completedDate = ?, photoData = ? WHERE id = ?`,
+                [averageRating, savedOwnRating, memory || '', completedDate || new Date().toISOString().split('T')[0], photoData || '', req.params.id],
+                updateErr => {
+                    if (updateErr) return res.status(500).json({ error: updateErr.message });
+                    res.json({ success: true });
+                }
+            );
+        });
     });
 
     router.patch('/ideas/:id/pin', requireAuth, (req, res) => {

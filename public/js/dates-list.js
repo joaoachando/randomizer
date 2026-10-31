@@ -228,13 +228,13 @@ function renderList() {
         const doneDates = ideas.filter(i => i.isDone).map(i => ({
             kind: 'date', id: i.id, title: i.isSecret ? '👀 Secret Date' : i.title,
             dateStr: i.completedDate || '', note: i.memory || '',
-            joaoR: i.joaoRating || i.rating || 5, jennaR: i.jennaRating || i.rating || 5,
+            joaoR: i.joaoRating || 0, jennaR: i.jennaRating || 0, averageR: i.rating || 0,
             photo: i.photoData || '', sub: `🎲 Date • ${i.vibe || ''}`
         }));
         const doneSpots = (typeof restaurants !== 'undefined' ? restaurants : []).filter(r => r.isVisited).map(r => ({
             kind: 'spot', id: r.id, title: `${r.name} (${r.city})`,
             dateStr: r.visitedDate || '', note: r.review || '',
-            joaoR: r.joaoRating || r.rating || 5, jennaR: r.jennaRating || r.rating || 5,
+            joaoR: r.joaoRating || 0, jennaR: r.jennaRating || 0, averageR: r.rating || 0,
             photo: r.photoData || '', sub: `🍽️ ${r.cuisine || 'Spot'} • ${r.price || ''}`
         }));
 
@@ -265,7 +265,7 @@ function renderList() {
                 <li class="idea-item scrapbook-event">
                     <div class="scrapbook-event-meta">
                         <span class="badge user-badge">📅 ${m.dateStr || 'Date not recorded'}</span>
-                        <span class="badge">João: ${m.joaoR}❤️ • Jenna: ${m.jennaR}❤️</span>
+                        <span class="badge">${formatPartnerRatings(m.joaoR, m.jennaR, m.averageR)}</span>
                     </div>
                     <div style="font-weight:800;font-size:15px;">${m.title}</div>
                     <div style="font-size:11.5px;opacity:0.7;">${m.sub}</div>
@@ -315,7 +315,7 @@ function renderList() {
         const doneStyle = i.isDone ? 'text-decoration: line-through; opacity: 0.7;' : '';
         const doneIcon = `<button class="action-btn action-btn-complete ${i.isDone ? 'is-complete' : ''}" onclick="markAsDone(${i.id})" title="${i.isDone ? 'Edit memory' : 'Mark date complete'}" aria-label="${i.isDone ? 'Edit memory' : 'Mark date complete'}">${i.isDone ? '💝' : '<svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>'}</button>`;
 
-        const splitR = (i.joaoRating && i.jennaRating) ? `João:${i.joaoRating}❤️ Jenna:${i.jennaRating}❤️` : '❤️'.repeat(i.rating || 5);
+        const splitR = formatPartnerRatings(i.joaoRating, i.jennaRating, i.rating);
         const completedBadge = i.isDone
             ? `<span class="badge" style="background: var(--accent); color: var(--bg-base); font-weight: 700;">✅ ${splitR}</span>`
             : '';

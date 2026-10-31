@@ -3,8 +3,8 @@ let selectedJennaRating = 5;
 let pendingMemoryPhoto = '';
 
 function openSplitMemoryModal(heading, title, joaoR, jennaR, noteText, photoData) {
-    selectedJoaoRating = joaoR || 5;
-    selectedJennaRating = jennaR || 5;
+    selectedJoaoRating = Number(joaoR) || 0;
+    selectedJennaRating = Number(jennaR) || 0;
     selectedHeartRating = Math.round((selectedJoaoRating + selectedJennaRating) / 2);
     pendingMemoryPhoto = photoData || '';
 
@@ -42,8 +42,8 @@ function markAsDone(id) {
     openSplitMemoryModal(
         '📸 Date Completed!',
         idea.title,
-        idea.joaoRating || idea.rating || 5,
-        idea.jennaRating || idea.rating || 5,
+        idea.joaoRating,
+        idea.jennaRating,
         idea.memory || '',
         idea.photoData || ''
     );
@@ -53,16 +53,23 @@ function renderHeartSelector() {
     const jRow = document.getElementById('heart-row-joao');
     const jeRow = document.getElementById('heart-row-jenna');
     if (jRow && jeRow) {
-        jRow.innerHTML = [1, 2, 3, 4, 5].map(n =>
-            `<span onclick="setPartnerHeart('joao', ${n})">${n <= selectedJoaoRating ? '❤️' : '🤍'}</span>`
-        ).join('');
-        jeRow.innerHTML = [1, 2, 3, 4, 5].map(n =>
-            `<span onclick="setPartnerHeart('jenna', ${n})">${n <= selectedJennaRating ? '❤️' : '🤍'}</span>`
-        ).join('');
+        const renderRow = (who, rating) => {
+            const isOwnRating = (userName === 'Joao' && who === 'joao') ||
+                (userName === 'Jenna' && who === 'jenna');
+            const stars = [1, 2, 3, 4, 5].map(n =>
+                `<span ${isOwnRating
+                    ? `onclick="setPartnerHeart('${who}', ${n})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();setPartnerHeart('${who}', ${n})}" role="button" tabindex="0" aria-label="Rate ${n} out of 5" style="cursor:pointer;"`
+                    : ''}>${n <= rating ? '❤️' : '🤍'}</span>`
+            ).join('');
+            return `${stars}${rating ? '' : '<small style="font-size:10px;opacity:.65;">Not rated</small>'}`;
+        };
+        jRow.innerHTML = renderRow('joao', selectedJoaoRating);
+        jeRow.innerHTML = renderRow('jenna', selectedJennaRating);
     }
 }
 
 function setPartnerHeart(who, n) {
+    if ((userName === 'Joao' && who !== 'joao') || (userName === 'Jenna' && who !== 'jenna')) return;
     triggerHaptic(8);
     if (who === 'joao') selectedJoaoRating = n;
     else selectedJennaRating = n;
@@ -135,9 +142,7 @@ async function saveDateMemory() {
         await apiFetch(`/api/restaurants/${completingRestaurantId}/visited`, {
             method: 'PATCH',
             body: JSON.stringify({
-                rating: selectedHeartRating,
-                joaoRating: selectedJoaoRating,
-                jennaRating: selectedJennaRating,
+                rating: userName === 'Joao' ? selectedJoaoRating : selectedJennaRating,
                 review: note,
                 visitedDate: todayStr,
                 photoData: pendingMemoryPhoto
@@ -155,9 +160,7 @@ async function saveDateMemory() {
     await apiFetch(`/api/ideas/${completingIdeaId}/done`, {
         method: 'PATCH',
         body: JSON.stringify({
-            rating: selectedHeartRating,
-            joaoRating: selectedJoaoRating,
-            jennaRating: selectedJennaRating,
+            rating: userName === 'Joao' ? selectedJoaoRating : selectedJennaRating,
             memory: note,
             completedDate: todayStr,
             photoData: pendingMemoryPhoto

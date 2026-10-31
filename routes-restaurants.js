@@ -193,19 +193,31 @@ module.exports = function(requireAuth, notifyPartner) {
     });
 
     router.patch('/restaurants/:id/visited', requireAuth, (req, res) => {
-        const { rating, joaoRating, jennaRating, review, visitedDate, photoData } = req.body;
-        const jR = Number(joaoRating) || Number(rating) || 5;
-        const jeR = Number(jennaRating) || Number(rating) || 5;
-        const avgR = Math.round((jR + jeR) / 2);
-
-        db.run(
-            `UPDATE restaurants SET isVisited = 1, rating = ?, joaoRating = ?, jennaRating = ?, review = ?, visitedDate = ?, photoData = ? WHERE id = ?`,
-            [avgR, jR, jeR, review || '', visitedDate || new Date().toISOString().split('T')[0], photoData || '', req.params.id],
-            (err) => {
-                if (err) return res.status(500).json({ error: err.message });
-                res.json({ success: true });
-            }
-        );
+        const { rating, review, visitedDate, photoData } = req.body || {};
+        const ownRating = Number(rating);
+        if (!Number.isInteger(ownRating) || ownRating < 0 || ownRating > 5) {
+            return res.status(400).json({ error: 'Rating must be an integer from 0 to 5.' });
+        }
+        const ownColumn = req.user === 'Jenna' ? 'jennaRating' : 'joaoRating';
+        const otherColumn = req.user === 'Jenna' ? 'joaoRating' : 'jennaRating';
+        db.get(`SELECT ${ownColumn}, ${otherColumn} FROM restaurants WHERE id = ?`, [req.params.id], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!row) return res.status(404).json({ error: 'Restaurant not found.' });
+            const savedOwnRating = ownRating || Number(row[ownColumn]) || 0;
+            const partnerRating = Number(row[otherColumn]) || 0;
+            const ratings = [savedOwnRating, partnerRating].filter(value => value > 0);
+            const averageRating = ratings.length
+                ? Math.round(ratings.reduce((sum, value) => sum + value, 0) / ratings.length)
+                : 0;
+            db.run(
+                `UPDATE restaurants SET isVisited = 1, rating = ?, ${ownColumn} = ?, review = ?, visitedDate = ?, photoData = ? WHERE id = ?`,
+                [averageRating, savedOwnRating, review || '', visitedDate || new Date().toISOString().split('T')[0], photoData || '', req.params.id],
+                updateErr => {
+                    if (updateErr) return res.status(500).json({ error: updateErr.message });
+                    res.json({ success: true });
+                }
+            );
+        });
     });
 
     router.delete('/restaurants/:id', requireAuth, (req, res) => {

@@ -12,6 +12,7 @@ let hasLoadedRestaurants = false;
 let pendingSpotLat = null;
 let pendingSpotLng = null;
 let pendingSpotThumb = '';
+let instagramEmbedScriptLoading = false;
 
 const DEFAULT_CUISINES = [
     '🍝 Italian', '🍣 Sushi/Asian', '🌮 Mexican', '🍔 Burgers',
@@ -92,6 +93,16 @@ async function autoFillFromMapsLink() {
 async function autoFetchSocialThumb() {
     const url = (document.getElementById('r-social')?.value || '').trim();
     if (!url.startsWith('http')) return;
+    pendingSpotThumb = '';
+    const thumbBox = document.getElementById('r-thumb-preview-box');
+    if (thumbBox) thumbBox.style.display = 'none';
+    const instagramUrl = getInstagramPermalink(url);
+    if (instagramUrl) {
+        renderInstagramEmbedPreview(instagramUrl);
+        showToast('📸 Instagram preview uses its official embed.');
+        return;
+    }
+    clearInstagramEmbedPreview();
     try {
         const res = await apiFetch('/api/social-oembed', {
             method: 'POST',
@@ -111,10 +122,65 @@ async function autoFetchSocialThumb() {
     } catch (e) {}
 }
 
+function getInstagramPermalink(value) {
+    try {
+        const url = new URL(value);
+        if (url.protocol !== 'https:' || !/(^|\.)instagram\.com$/i.test(url.hostname)) return '';
+        const match = url.pathname.match(/^\/(p|reel|tv)\/([A-Za-z0-9_-]+)\/?$/i);
+        if (!match) return '';
+        return `https://www.instagram.com/${match[1].toLowerCase()}/${match[2]}/`;
+    } catch (e) {
+        return '';
+    }
+}
+
+function instagramEmbedMarkup(url) {
+    return `<blockquote class="instagram-media spot-instagram-embed" data-instgrm-permalink="${url}" data-instgrm-version="14">
+        <a href="${url}" target="_blank" rel="noopener">View this Instagram post or Reel</a>
+    </blockquote>`;
+}
+
+function processInstagramEmbeds() {
+    if (window.instgrm?.Embeds) {
+        window.instgrm.Embeds.process();
+        return;
+    }
+    if (instagramEmbedScriptLoading) return;
+    instagramEmbedScriptLoading = true;
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = 'https://www.instagram.com/embed.js';
+    script.onload = () => {
+        instagramEmbedScriptLoading = false;
+        window.instgrm?.Embeds?.process();
+    };
+    script.onerror = () => {
+        instagramEmbedScriptLoading = false;
+    };
+    document.head.appendChild(script);
+}
+
+function renderInstagramEmbedPreview(url) {
+    const preview = document.getElementById('r-instagram-preview');
+    if (!preview) return;
+    preview.innerHTML = instagramEmbedMarkup(url);
+    preview.style.display = 'block';
+    processInstagramEmbeds();
+}
+
+function clearInstagramEmbedPreview() {
+    const preview = document.getElementById('r-instagram-preview');
+    if (preview) {
+        preview.innerHTML = '';
+        preview.style.display = 'none';
+    }
+}
+
 function clearPendingThumb() {
     pendingSpotThumb = '';
     const box = document.getElementById('r-thumb-preview-box');
     if (box) box.style.display = 'none';
+    clearInstagramEmbedPreview();
 }
 
 async function fetchRestaurants() {
@@ -306,7 +372,10 @@ function editRestaurant(id) {
     document.getElementById('r-trip').value = r.tripFolder || '';
     pendingSpotLat = r.lat || null;
     pendingSpotLng = r.lng || null;
-    pendingSpotThumb = r.thumbnailUrl || '';
+    const instagramUrl = getInstagramPermalink(r.socialLink || '');
+    pendingSpotThumb = instagramUrl ? '' : (r.thumbnailUrl || '');
+    if (instagramUrl) renderInstagramEmbedPreview(instagramUrl);
+    else clearInstagramEmbedPreview();
 
     const box = document.getElementById('r-thumb-preview-box');
     const img = document.getElementById('r-thumb-preview-img');
@@ -342,7 +411,7 @@ function markRestaurantVisited(id) {
     completingIdeaId = null;
     completingRestaurantId = id;
     if (typeof openSplitMemoryModal === 'function') {
-        openSplitMemoryModal('🍽️ Spot Visited!', `${r.name} (${r.city})`, r.joaoRating || r.rating || 5, r.jennaRating || r.rating || 5, r.review || '', r.photoData || '');
+        openSplitMemoryModal('🍽️ Spot Visited!', `${r.name} (${r.city})`, r.joaoRating, r.jennaRating, r.review || '', r.photoData || '');
     } else {
         selectedHeartRating = r.rating || 5;
         document.getElementById('memory-modal-heading').innerText = '🍽️ Spot Visited!';
@@ -439,9 +508,7 @@ function renderRestaurantList() {
 
         let visitedBadge = '';
         if (r.isVisited) {
-            const splitStr = (r.joaoRating && r.jennaRating)
-                ? `João:${r.joaoRating}❤️ Jenna:${r.jennaRating}❤️`
-                : '❤️'.repeat(r.rating || 5);
+            const splitStr = formatPartnerRatings(r.joaoRating, r.jennaRating, r.rating);
             visitedBadge = `<span class="badge user-badge">✅ ${splitStr}</span>`;
         }
 
@@ -449,12 +516,14 @@ function renderRestaurantList() {
         const tripBadge = r.tripFolder ? `<span class="badge" style="border-color:#60a5fa;color:#60a5fa;cursor:pointer;" onclick="if(typeof openTripDashboardModal==='function') openTripDashboardModal('${r.tripFolder.replace(/'/g, "\\'")}')">✈️ ${r.tripFolder}</span>` : '';
         const typeBadge = `<span class="badge">${TYPE_LABELS[r.spotType] || '🍽️ Dining'}</span>`;
 
-        const thumbHtml = r.thumbnailUrl
+        const instagramUrl = getInstagramPermalink(r.socialLink || '');
+        const thumbHtml = !instagramUrl && r.thumbnailUrl
             ? `<a href="${r.socialLink || mapsHref}" target="_blank" rel="noopener" class="spot-thumb-link">
                 <img src="${r.thumbnailUrl}" class="spot-thumb-img" alt="${r.name}" loading="lazy">
                 <span class="spot-thumb-play">▶ Reel</span>
                </a>`
             : '';
+        const instagramEmbedHtml = instagramUrl ? instagramEmbedMarkup(instagramUrl) : '';
 
         const photoHtml = (r.isVisited && r.photoData)
             ? `<img src="${r.photoData}" class="memory-photo-img" alt="Visit memory" loading="lazy">`
@@ -475,6 +544,7 @@ function renderRestaurantList() {
                                 <button class="action-btn action-btn-delete" onclick="deleteRestaurant(${r.id})" title="Delete spot" aria-label="Delete spot"><svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M5 7l1 14h12l1-14M9 7V4h6v3"/></svg></button>
                             </div>
                         </div>
+                        ${instagramEmbedHtml}
                         ${r.mustOrder ? `<div style="font-size: 12.5px; opacity: 0.88; margin-top: 3px;">💡 <b>${r.spotType === 'cook' ? 'Ingredients/Notes:' : 'Order/Note:'}</b> ${linkify(r.mustOrder)}</div>` : ''}
                         ${r.isVisited && r.review ? `<div class="memory-quote">“${linkify(r.review)}”</div>` : ''}
                         ${photoHtml}
@@ -494,6 +564,7 @@ function renderRestaurantList() {
             </li>
         `;
     }).join('') || `<li class="idea-item" style="text-align:center;opacity:0.7;">No spots match this filter yet! Tap ➕ Add Spot above.</li>`;
+    if (filtered.some(r => getInstagramPermalink(r.socialLink || ''))) processInstagramEmbeds();
 }
 
 async function pickRandomRestaurant() {

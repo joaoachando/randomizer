@@ -44,6 +44,13 @@ function renderLoadingSkeleton(list, count = 3) {
     `).join('');
 }
 
+function formatPartnerRatings(joaoRating, jennaRating, averageRating) {
+    const joao = Number(joaoRating) || 0;
+    const jenna = Number(jennaRating) || 0;
+    const average = Number(averageRating) || 0;
+    return `João: ${joao ? `${joao}❤️` : '—'} • Jenna: ${jenna ? `${jenna}❤️` : '—'} • Avg: ${average ? `${average}❤️` : '—'}`;
+}
+
 function askConfirm(message) {
     triggerHaptic(12);
     return new Promise((resolve) => {
@@ -142,6 +149,7 @@ async function apiFetch(url, options = {}) {
 }
 
 async function flushOfflineOutbox() {
+    if (!navigator.onLine || !userName || userName === 'Guest') return;
     const raw = localStorage.getItem('p3_outbox');
     if (!raw) return;
     const outbox = JSON.parse(raw);
@@ -346,6 +354,7 @@ async function completeLogin(name) {
     localStorage.removeItem('userPassword');
 
     document.getElementById('login-overlay').style.display = 'none';
+    await flushOfflineOutbox();
     const welcomeEl = document.getElementById('welcome-text');
     welcomeEl.innerText = `👤 ${userName} ⇄`;
     welcomeEl.style.display = 'inline-block';
